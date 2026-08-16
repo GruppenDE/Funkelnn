@@ -1369,13 +1369,11 @@ function galleryImgKey(photoId){ return 'farol-gallery-img-'+photoId; }
 // margen de 1 MB, de sobra para un avatar + banner comprimidos.
 function avatarKey(username){ return 'farol-avatar-'+username.toLowerCase(); }
 function bannerKey(username){ return 'farol-banner-'+username.toLowerCase(); }
-function bannerPosKey(username){ return 'farol-bannerpos-'+username.toLowerCase(); }
 // Cache en memoria: undefined = todavía no se pidió, null = se pidió y no
 // hay foto, string = la imagen. Evita re-pedir a Firestore la misma foto
 // una y otra vez mientras dura la sesión.
 const avatarCache = {};
 const bannerCache = {};
-const bannerPosCache = {};
 
 // Local cache of every user's public profile (avatar/color), refreshed on
 // init and every poll cycle, so avatars stay current without extra reads.
@@ -2200,16 +2198,8 @@ function renderProfileView(u){
     }).catch(()=>{ bannerCache[bKey] = null; });
   }
 
-  const knownPos = (bannerPosCache[bKey] !== undefined) ? bannerPosCache[bKey] : u.bannerPos;
+  const knownPos = u.bannerPos;
   applyBannerPosition(banner, knownPos);
-  if(bannerPosCache[bKey] === undefined){
-    sGet(bannerPosKey(u.username), true).then(val => {
-      bannerPosCache[bKey] = val || null;
-      if(val && viewingProfile === u.username){
-        applyBannerPosition(document.getElementById('profile-banner'), val);
-      }
-    }).catch(()=>{ bannerPosCache[bKey] = null; });
-  }
 
   const avEl = document.getElementById('profile-avatar');
   avEl.className = 'avatar profile-avatar';
@@ -2324,10 +2314,8 @@ async function handleBannerFile(e){
     currentUser.banner = dataUrl; // solo en memoria, para esta sesión
     if(usersCache[key]) usersCache[key].banner = dataUrl;
     // Un banner nuevo arranca centrado; el usuario puede reajustar enseguida.
-    bannerPosCache[key] = '50% 50%';
     currentUser.bannerPos = '50% 50%';
     if(usersCache[key]) usersCache[key].bannerPos = '50% 50%';
-    sSetCritical(bannerPosKey(currentUser.username), '50% 50%', true).catch(()=>{});
     renderProfileView(currentUser);
     showToast(ok ? 'Banner aktualisiert.' : 'Lokal aktualisiert, konnte aber nicht auf dem Server gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
     if(ok) openBannerPositionModal();
@@ -2353,7 +2341,7 @@ function openBannerPositionModal(){
     const dispW = naturalW * scale, dispH = naturalH * scale;
     img.style.width = dispW + 'px';
     img.style.height = dispH + 'px';
-    const posStr = bannerPosCache[key] || currentUser.bannerPos || '50% 50%';
+    const posStr = currentUser.bannerPos || '50% 50%';
     const parts = posStr.split(' ').map(s => parseFloat(s));
     const px = isNaN(parts[0]) ? 50 : parts[0];
     const py = isNaN(parts[1]) ? 50 : parts[1];
@@ -2424,11 +2412,19 @@ async function saveBannerPosition(){
   const px = rangeX > 0 ? Math.round((-left / rangeX) * 100) : 50;
   const py = rangeY > 0 ? Math.round((-top / rangeY) * 100) : 50;
   const posStr = `${px}% ${py}%`;
+
+  // Se guarda dentro del mismo documento "farol-users" (junto a bio/socials)
+  // en vez de un documento propio, para no depender de un permiso de
+  // escritura nuevo en las reglas de Firestore.
   const key = currentUser.username.toLowerCase();
-  const ok = await sSetCritical(bannerPosKey(currentUser.username), posStr, true);
-  bannerPosCache[key] = posStr;
+  const users = await sGet('farol-users', true) || usersCache;
+  const u = users[key] || currentUser;
+  u.bannerPos = posStr;
+  users[key] = u;
+  let ok = true;
+  try{ await sSet('farol-users', users, true); }catch(e){ ok = false; }
+  usersCache = users;
   currentUser.bannerPos = posStr;
-  if(usersCache[key]) usersCache[key].bannerPos = posStr;
   applyBannerPosition(document.getElementById('profile-banner'), posStr);
   closeBannerPositionModal();
   showToast(ok ? 'Bannerposition gespeichert.' : 'Konnte nicht gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
