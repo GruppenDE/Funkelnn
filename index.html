@@ -41,7 +41,12 @@
   }
   h1,h2,h3,.brand,button,.tab,.room-name{font-family:'Fredoka',sans-serif;}
   button{font-family:'Inter',sans-serif;}
-  #app{height:100vh;width:100vw;}
+  /* 100vh on mobile counts the full screen including the browser's
+     address bar, which is taller than what's actually visible — that's
+     what was pushing the topbar half off-screen. 100dvh tracks the real
+     visible area and updates as the address bar shows/hides. Keep 100vh
+     first as a fallback for older browsers that don't support dvh. */
+  #app{height:100vh;height:100dvh;width:100vw;overflow:hidden;}
   .hidden{display:none !important;}
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-thumb{background:var(--bg-card-2);border-radius:8px;}
@@ -50,6 +55,7 @@
   /* ---------- AUTH VIEW ---------- */
   #view-auth{
     height:100vh;
+    height:100dvh;
     display:grid;
     grid-template-columns:1.1fr 1fr;
     grid-template-rows:1fr auto;
