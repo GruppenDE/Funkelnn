@@ -457,8 +457,23 @@
   .banner-edit-btn{
     position:absolute;right:14px;bottom:14px;background:rgba(10,10,20,.55);color:var(--text-cream);
     border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px 12px;font-size:12px;cursor:pointer;
-    display:inline-flex;align-items:center;gap:5px;user-select:none;z-index:3;
+    display:inline-flex;align-items:center;gap:5px;user-select:none;z-index:3;font-family:'Inter',sans-serif;
   }
+  .banner-edit-btn:hover{background:rgba(10,10,20,.75);}
+  .banner-pos-btn{right:auto;left:14px;}
+  @media (max-width:480px){
+    .banner-edit-btn{font-size:11px;padding:5px 9px;}
+    .banner-pos-btn{left:10px;}
+    #banner-edit-btn{right:10px;}
+  }
+  .banner-position-frame{
+    position:relative;width:100%;height:150px;overflow:hidden;border-radius:var(--radius-md);
+    background:var(--bg-void);touch-action:none;cursor:grab;margin:14px 0 6px;
+    border:1px solid rgba(255,255,255,.1);
+  }
+  .banner-position-frame.dragging{cursor:grabbing;}
+  .banner-position-frame img{position:absolute;top:0;left:0;max-width:none;user-select:none;pointer-events:none;}
+  .banner-position-hint{font-size:11.5px;color:var(--text-muted);text-align:center;margin-bottom:4px;}
   .profile-head{display:flex;flex-direction:column;gap:12px;padding:0 24px 2px;margin-top:-40px;position:relative;}
   .profile-head-top{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;}
   .profile-avatar-wrap{position:relative;flex:0 0 auto;}
@@ -1030,6 +1045,7 @@
 
       <div class="profile-banner" id="profile-banner">
         <input type="file" id="banner-file" accept="image/*" class="hidden-file" onchange="handleBannerFile(event)">
+        <button type="button" class="banner-edit-btn banner-pos-btn hidden" id="banner-pos-btn" onclick="openBannerPositionModal()">🎯 Position anpassen</button>
         <label class="banner-edit-btn hidden" id="banner-edit-btn" for="banner-file">📷 Banner ändern</label>
       </div>
 
@@ -1105,6 +1121,20 @@
     </div>
   </div>
 
+
+  <div id="banner-position-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeBannerPositionModal()">
+    <div class="modal">
+      <h3>Bannerposition anpassen</h3>
+      <div class="banner-position-hint">Zieh das Bild, um den sichtbaren Ausschnitt festzulegen.</div>
+      <div class="banner-position-frame" id="banner-position-frame">
+        <img id="banner-position-img" alt="Banner" draggable="false">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeBannerPositionModal()">Abbrechen</button>
+        <button class="btn-primary" onclick="saveBannerPosition()">Speichern</button>
+      </div>
+    </div>
+  </div>
 
   <div id="lightbox-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeLightbox()">
     <div class="lightbox-panel">
@@ -1339,11 +1369,13 @@ function galleryImgKey(photoId){ return 'farol-gallery-img-'+photoId; }
 // margen de 1 MB, de sobra para un avatar + banner comprimidos.
 function avatarKey(username){ return 'farol-avatar-'+username.toLowerCase(); }
 function bannerKey(username){ return 'farol-banner-'+username.toLowerCase(); }
+function bannerPosKey(username){ return 'farol-bannerpos-'+username.toLowerCase(); }
 // Cache en memoria: undefined = todavía no se pidió, null = se pidió y no
 // hay foto, string = la imagen. Evita re-pedir a Firestore la misma foto
 // una y otra vez mientras dura la sesión.
 const avatarCache = {};
 const bannerCache = {};
+const bannerPosCache = {};
 
 // Local cache of every user's public profile (avatar/color), refreshed on
 // init and every poll cycle, so avatars stay current without extra reads.
@@ -2168,6 +2200,17 @@ function renderProfileView(u){
     }).catch(()=>{ bannerCache[bKey] = null; });
   }
 
+  const knownPos = (bannerPosCache[bKey] !== undefined) ? bannerPosCache[bKey] : u.bannerPos;
+  applyBannerPosition(banner, knownPos);
+  if(bannerPosCache[bKey] === undefined){
+    sGet(bannerPosKey(u.username), true).then(val => {
+      bannerPosCache[bKey] = val || null;
+      if(val && viewingProfile === u.username){
+        applyBannerPosition(document.getElementById('profile-banner'), val);
+      }
+    }).catch(()=>{ bannerPosCache[bKey] = null; });
+  }
+
   const avEl = document.getElementById('profile-avatar');
   avEl.className = 'avatar profile-avatar';
   applyAvatarStyle(avEl, u.username);
@@ -2177,6 +2220,7 @@ function renderProfileView(u){
   document.getElementById('profile-logout-btn').classList.toggle('hidden', !isOwn);
   document.getElementById('profile-dm-btn').classList.toggle('hidden', isOwn);
   document.getElementById('banner-edit-btn').classList.toggle('hidden', !isOwn);
+  document.getElementById('banner-pos-btn').classList.toggle('hidden', !(isOwn && knownBanner));
   document.getElementById('avatar-edit-btn').classList.toggle('hidden', !isOwn);
   document.getElementById('gallery-add-btn').classList.toggle('hidden', !isOwn);
 
@@ -2264,6 +2308,10 @@ async function handleAvatarFile(e){
   e.target.value = '';
 }
 
+function applyBannerPosition(el, posStr){
+  el.style.backgroundPosition = posStr || '50% 50%';
+}
+
 async function handleBannerFile(e){
   const file = e.target.files[0];
   if(!file) return;
@@ -2275,13 +2323,115 @@ async function handleBannerFile(e){
     bannerCache[key] = dataUrl;
     currentUser.banner = dataUrl; // solo en memoria, para esta sesión
     if(usersCache[key]) usersCache[key].banner = dataUrl;
+    // Un banner nuevo arranca centrado; el usuario puede reajustar enseguida.
+    bannerPosCache[key] = '50% 50%';
+    currentUser.bannerPos = '50% 50%';
+    if(usersCache[key]) usersCache[key].bannerPos = '50% 50%';
+    sSetCritical(bannerPosKey(currentUser.username), '50% 50%', true).catch(()=>{});
     renderProfileView(currentUser);
     showToast(ok ? 'Banner aktualisiert.' : 'Lokal aktualisiert, konnte aber nicht auf dem Server gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
+    if(ok) openBannerPositionModal();
   }catch(err){
     console.error(err);
     showToast('Der Banner konnte nicht hochgeladen werden. Versuche es mit einem kleineren Bild.', 'error');
   }
   e.target.value = '';
+}
+
+/* ---------------- BANNER POSITION ADJUSTER ---------------- */
+function openBannerPositionModal(){
+  if(!currentUser) return;
+  const key = currentUser.username.toLowerCase();
+  const dataUrl = bannerCache[key] || currentUser.banner;
+  if(!dataUrl){ showToast('Lade zuerst ein Bannerbild hoch.'); return; }
+  const img = document.getElementById('banner-position-img');
+  const frame = document.getElementById('banner-position-frame');
+  img.onload = () => {
+    const naturalW = img.naturalWidth, naturalH = img.naturalHeight;
+    const frameW = frame.clientWidth, frameH = frame.clientHeight;
+    const scale = Math.max(frameW / naturalW, frameH / naturalH);
+    const dispW = naturalW * scale, dispH = naturalH * scale;
+    img.style.width = dispW + 'px';
+    img.style.height = dispH + 'px';
+    const posStr = bannerPosCache[key] || currentUser.bannerPos || '50% 50%';
+    const parts = posStr.split(' ').map(s => parseFloat(s));
+    const px = isNaN(parts[0]) ? 50 : parts[0];
+    const py = isNaN(parts[1]) ? 50 : parts[1];
+    img.style.left = (-((px / 100) * (dispW - frameW))) + 'px';
+    img.style.top = (-((py / 100) * (dispH - frameH))) + 'px';
+  };
+  img.src = dataUrl;
+  document.getElementById('banner-position-modal').classList.remove('hidden');
+}
+function closeBannerPositionModal(){
+  document.getElementById('banner-position-modal').classList.add('hidden');
+}
+
+(function setupBannerPositionDrag(){
+  const frame = document.getElementById('banner-position-frame');
+  if(!frame) return;
+  let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+  function pointerDown(e){
+    const img = document.getElementById('banner-position-img');
+    if(!img.style.width) return; // imagen todavía no está lista
+    dragging = true;
+    frame.classList.add('dragging');
+    const p = e.touches ? e.touches[0] : e;
+    startX = p.clientX; startY = p.clientY;
+    startLeft = parseFloat(img.style.left) || 0;
+    startTop = parseFloat(img.style.top) || 0;
+    e.preventDefault();
+  }
+  function pointerMove(e){
+    if(!dragging) return;
+    const img = document.getElementById('banner-position-img');
+    const frameW = frame.clientWidth, frameH = frame.clientHeight;
+    const dispW = parseFloat(img.style.width), dispH = parseFloat(img.style.height);
+    const p = e.touches ? e.touches[0] : e;
+    let newLeft = startLeft + (p.clientX - startX);
+    let newTop = startTop + (p.clientY - startY);
+    const minLeft = Math.min(0, frameW - dispW);
+    const minTop = Math.min(0, frameH - dispH);
+    newLeft = Math.min(0, Math.max(minLeft, newLeft));
+    newTop = Math.min(0, Math.max(minTop, newTop));
+    img.style.left = newLeft + 'px';
+    img.style.top = newTop + 'px';
+    e.preventDefault();
+  }
+  function pointerUp(){
+    dragging = false;
+    frame.classList.remove('dragging');
+  }
+  frame.addEventListener('mousedown', pointerDown);
+  window.addEventListener('mousemove', pointerMove);
+  window.addEventListener('mouseup', pointerUp);
+  frame.addEventListener('touchstart', pointerDown, {passive:false});
+  window.addEventListener('touchmove', pointerMove, {passive:false});
+  window.addEventListener('touchend', pointerUp);
+})();
+
+async function saveBannerPosition(){
+  if(!currentUser) return;
+  const img = document.getElementById('banner-position-img');
+  const frame = document.getElementById('banner-position-frame');
+  const frameW = frame.clientWidth, frameH = frame.clientHeight;
+  const dispW = parseFloat(img.style.width) || frameW;
+  const dispH = parseFloat(img.style.height) || frameH;
+  const left = parseFloat(img.style.left) || 0;
+  const top = parseFloat(img.style.top) || 0;
+  const rangeX = dispW - frameW, rangeY = dispH - frameH;
+  const px = rangeX > 0 ? Math.round((-left / rangeX) * 100) : 50;
+  const py = rangeY > 0 ? Math.round((-top / rangeY) * 100) : 50;
+  const posStr = `${px}% ${py}%`;
+  const key = currentUser.username.toLowerCase();
+  const ok = await sSetCritical(bannerPosKey(currentUser.username), posStr, true);
+  bannerPosCache[key] = posStr;
+  currentUser.bannerPos = posStr;
+  if(usersCache[key]) usersCache[key].bannerPos = posStr;
+  applyBannerPosition(document.getElementById('profile-banner'), posStr);
+  closeBannerPositionModal();
+  showToast(ok ? 'Bannerposition gespeichert.' : 'Konnte nicht gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
 }
 
 /* ================= GALLERY ================= */
