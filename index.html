@@ -43,7 +43,11 @@
   }
   h1,h2,h3,.brand,button,.tab,.room-name{font-family:'Fredoka',sans-serif;}
   button{font-family:'Inter',sans-serif;}
-  #app{height:100vh;width:100vw;}
+  /* 100vh on mobile counts the full screen including the browser's
+     address bar, which is taller than what's actually visible — that
+     pushes the topbar half off-screen. 100dvh tracks the real visible
+     area. Keep 100vh first as a fallback for older browsers. */
+  #app{height:100vh;height:100dvh;width:100vw;overflow:hidden;}
   .hidden{display:none !important;}
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-thumb{background:var(--bg-card-2);border-radius:8px;}
@@ -52,6 +56,7 @@
   /* ---------- AUTH VIEW ---------- */
   #view-auth{
     height:100vh;
+    height:100dvh;
     display:grid;
     grid-template-columns:1.1fr 1fr;
     grid-template-rows:1fr auto;
@@ -1287,6 +1292,11 @@ let usersCache = {};
 async function refreshUsersCache(){
   const users = await sGet('farol-users', true);
   if(users) usersCache = users;
+  // Never let a background refresh clobber what we know locally about
+  // ourselves (bio/socials saved via this doc). Avatar/banner live in their
+  // own per-user documents now, so they aren't affected by this doc at all —
+  // but this still guards against a stale poll undoing a bio/socials save.
+  if(currentUser) usersCache[currentUser.username.toLowerCase()] = currentUser;
 }
 function userLookup(username){
   if(username === ADMIN_NAME) return usersCache[ADMIN_NAME.toLowerCase()] || buildAdminUser();
@@ -1322,7 +1332,12 @@ function paintAvatarEl(el, username, avatarUrl){
       el.style.backgroundImage = `url(${avatarUrl})`;
       el.style.backgroundSize = 'cover';
       el.style.backgroundPosition = 'center';
-      el.style.background = '';
+      // IMPORTANT: never assign el.style.background = '' here — "background"
+      // is the shorthand property, and clearing it also wipes out the
+      // backgroundImage we just set two lines above (that was the actual
+      // bug making the avatar photo disappear). backgroundColor is the
+      // correct longhand to clear on its own.
+      el.style.backgroundColor = '';
       el.textContent = '';
     };
     probe.onerror = () => {
