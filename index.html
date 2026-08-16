@@ -437,33 +437,64 @@
   }
   .profile-close{position:absolute;top:12px;right:12px;z-index:5;background:rgba(10,10,20,.55);}
   .profile-banner{
-    height:150px;background:linear-gradient(120deg,#2a2f66,#1a1d42);background-size:cover;background-position:center;
-    position:relative;border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    height:150px;background:linear-gradient(120deg,#2a2f66,#1a1d42);
+    position:relative;border-radius:var(--radius-lg) var(--radius-lg) 0 0;overflow:hidden;
   }
+  .banner-img{
+    position:absolute;inset:0;background-size:cover;background-position:center 50%;
+    transform:scale(var(--banner-zoom,1));transform-origin:center;
+    transition:transform .35s cubic-bezier(.34,1.56,.64,1), background-position .15s linear;
+  }
+  /* Grows slightly on hover, then eases back to its original size when the
+     cursor leaves — the same bouncy curve is reused for the "pop" class so
+     a fresh upload gets the identical grow-and-settle feel. */
+  .profile-banner:hover .banner-img{transform:scale(calc(var(--banner-zoom, 1) * 1.06));}
+  @keyframes bannerPop{
+    0%{transform:scale(var(--banner-zoom,1));}
+    45%{transform:scale(calc(var(--banner-zoom, 1) * 1.14));}
+    100%{transform:scale(var(--banner-zoom,1));}
+  }
+  .banner-img.pop{animation:bannerPop .55s cubic-bezier(.34,1.56,.64,1);}
+  .banner-btn-row{position:absolute;right:14px;bottom:14px;z-index:3;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
   .banner-edit-btn{
-    position:absolute;right:14px;bottom:14px;background:rgba(10,10,20,.55);color:var(--text-cream);
+    background:rgba(10,10,20,.55);color:var(--text-cream);
     border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px 12px;font-size:12px;cursor:pointer;
-    display:inline-flex;align-items:center;gap:5px;user-select:none;z-index:3;
+    display:inline-flex;align-items:center;gap:5px;user-select:none;
   }
-  .profile-head{display:flex;align-items:flex-end;gap:14px;padding:0 24px;margin-top:-40px;position:relative;flex-wrap:wrap;}
-  .profile-avatar-wrap{position:relative;flex:0 0 auto;}
+  .banner-adjust-panel{
+    position:absolute;inset:0;background:rgba(8,8,20,.74);z-index:4;
+    display:flex;flex-direction:column;justify-content:center;gap:12px;padding:16px 22px;
+  }
+  .banner-adjust-panel label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-cream);}
+  .banner-adjust-panel input[type=range]{width:100%;accent-color:var(--accent-amber, #FFD54A);}
+  .banner-adjust-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:2px;}
+  .profile-head{padding:0 24px;margin-top:-44px;position:relative;z-index:2;}
+  .profile-avatar-wrap{position:relative;display:inline-block;}
   .profile-avatar{width:88px;height:88px;font-size:28px;border:4px solid var(--bg-card);background-color:var(--bg-card-2);}
   .avatar-edit-btn{
     position:absolute;bottom:0;right:0;background:var(--accent-amber);color:#2b0618;border:2px solid var(--bg-card);
     border-radius:50%;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
     user-select:none;z-index:3;
   }
-  .profile-head-info{flex:1;padding-bottom:8px;min-width:0;}
-  .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;}
-  .profile-handle{font-size:12.5px;color:var(--text-muted);}
-  .profile-edit-toggle{width:auto;padding:8px 16px;margin-bottom:8px;font-size:13px;}
+  /* Name/handle + action buttons now live below the banner overlap, in
+     normal flow, so they never fight the avatar for space or spill over
+     the banner image. */
+  .profile-meta{
+    display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;
+    gap:10px 14px;padding:10px 24px 0;
+  }
+  .profile-head-info{flex:1 1 180px;min-width:180px;}
+  .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:break-word;line-height:1.25;}
+  .profile-handle{font-size:12.5px;color:var(--text-muted);margin-top:2px;}
+  .profile-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;flex-wrap:wrap;}
+  .profile-edit-toggle{width:auto;padding:8px 16px;font-size:13px;}
   .profile-logout-btn{
-    width:auto;flex:0 0 auto;margin-bottom:8px;font-size:16px;
+    width:auto;flex:0 0 auto;font-size:16px;
     border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 10px;
     color:var(--accent-coral);
   }
   .profile-logout-btn:hover{background:rgba(255,61,107,.1);border-color:rgba(255,61,107,.4);}
-  .profile-dm-btn{width:auto;padding:8px 16px;margin-bottom:8px;font-size:13px;display:inline-flex;align-items:center;gap:7px;}
+  .profile-dm-btn{width:auto;padding:8px 16px;font-size:13px;display:inline-flex;align-items:center;gap:7px;}
   .profile-body{padding:18px 24px 26px;}
   .profile-bio{font-size:13.5px;color:var(--text-cream);line-height:1.6;margin:6px 0 18px;white-space:pre-wrap;}
   .social-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
@@ -554,6 +585,11 @@
   .lightbox-side{width:42%;display:flex;flex-direction:column;padding:20px;min-height:0;}
   .lightbox-caption{font-size:13.5px;color:var(--text-cream);margin-bottom:10px;}
   .lightbox-like-row{margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;}
+  .lightbox-delete-btn{
+    width:auto;align-self:flex-start;margin-bottom:14px;font-size:12.5px;padding:7px 14px;
+    color:var(--accent-coral);border-color:rgba(255,61,107,.3);display:inline-flex;align-items:center;gap:7px;
+  }
+  .lightbox-delete-btn:hover{background:rgba(255,61,107,.12);border-color:rgba(255,61,107,.5);}
   .reaction-btn{
     background:var(--bg-void);border:1px solid rgba(255,255,255,.08);border-radius:20px;
     padding:7px 12px;color:var(--text-cream);cursor:pointer;font-size:13px;
@@ -961,8 +997,24 @@
       <button class="btn-icon profile-close" onclick="closeProfile()">✕</button>
 
       <div class="profile-banner" id="profile-banner">
+        <div class="banner-img" id="banner-img"></div>
         <input type="file" id="banner-file" accept="image/*" class="hidden-file" onchange="handleBannerFile(event)">
-        <label class="banner-edit-btn hidden" id="banner-edit-btn" for="banner-file">📷 Cambiar banner</label>
+        <div class="banner-btn-row">
+          <label class="banner-edit-btn hidden" id="banner-edit-btn" for="banner-file">📷 Cambiar banner</label>
+          <button type="button" class="banner-edit-btn hidden" id="banner-adjust-btn" onclick="openBannerAdjust()">🔍 Ajustar tamaño</button>
+        </div>
+        <div class="banner-adjust-panel hidden" id="banner-adjust-panel">
+          <label>Zoom
+            <input type="range" id="banner-zoom-range" min="100" max="200" value="100" oninput="previewBannerAdjust()">
+          </label>
+          <label>Posición vertical
+            <input type="range" id="banner-pos-range" min="0" max="100" value="50" oninput="previewBannerAdjust()">
+          </label>
+          <div class="banner-adjust-actions">
+            <button type="button" class="btn-ghost" onclick="cancelBannerAdjust()">Cancelar</button>
+            <button type="button" class="btn-primary" onclick="saveBannerAdjust()">Guardar</button>
+          </div>
+        </div>
       </div>
 
       <div class="profile-head">
@@ -971,13 +1023,18 @@
           <input type="file" id="avatar-file" accept="image/*" class="hidden-file" onchange="handleAvatarFile(event)">
           <label class="avatar-edit-btn hidden" id="avatar-edit-btn" for="avatar-file">📷</label>
         </div>
+      </div>
+
+      <div class="profile-meta">
         <div class="profile-head-info">
           <div class="profile-name" id="profile-name"></div>
           <div class="profile-handle" id="profile-handle"></div>
         </div>
-        <button class="btn-primary profile-edit-toggle hidden" id="profile-edit-toggle" onclick="toggleProfileEdit()">Editar perfil</button>
-        <button class="btn-icon profile-logout-btn hidden" id="profile-logout-btn" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">⏻</button>
-        <button class="btn-primary profile-dm-btn hidden" id="profile-dm-btn" onclick="startPrivateChat()"><i class="fa-solid fa-comment-dots"></i> Chat privado</button>
+        <div class="profile-actions">
+          <button class="btn-primary profile-edit-toggle hidden" id="profile-edit-toggle" onclick="toggleProfileEdit()">Editar perfil</button>
+          <button class="btn-icon profile-logout-btn hidden" id="profile-logout-btn" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión"><i class="fa-solid fa-power-off"></i></button>
+          <button class="btn-primary profile-dm-btn hidden" id="profile-dm-btn" onclick="startPrivateChat()"><i class="fa-solid fa-comment-dots"></i> Chat privado</button>
+        </div>
       </div>
 
       <div class="profile-body">
@@ -986,7 +1043,7 @@
           <p class="profile-bio" id="profile-bio"></p>
           <div class="social-row" id="profile-socials"></div>
           <div class="gallery-header">
-            <div class="sidebar-h" style="margin:0;">Galería</div>
+            <div class="sidebar-h" style="margin:0;" id="gallery-title">Galería</div>
             <label class="btn-ghost gallery-add hidden" id="gallery-add-btn" for="gallery-file">+ Añadir foto</label>
             <input type="file" id="gallery-file" accept="image/*" class="hidden-file" onchange="handleGalleryFile(event)">
           </div>
@@ -1041,6 +1098,7 @@
       <div class="lightbox-side">
         <div class="lightbox-caption" id="lightbox-caption"></div>
         <div class="lightbox-like-row" id="lightbox-reactions"></div>
+        <button class="btn-ghost lightbox-delete-btn hidden" id="lightbox-delete-btn" onclick="deletePhoto()"><i class="fa-solid fa-trash-can"></i> Eliminar foto</button>
         <div class="comments-list" id="comments-list"></div>
         <form class="comment-form" onsubmit="handleAddComment(event)">
           <input id="comment-input" placeholder="Escribe un comentario..." maxlength="200" autocomplete="off">
@@ -1232,6 +1290,7 @@ function initials(name){ return name.trim().slice(0,2).toUpperCase(); }
 function newMsgId(){ return Date.now()+'-'+Math.random().toString(36).slice(2,8); }
 function msgKey(roomId){ return 'farol-msgs-'+roomId; }
 function galleryKey(username){ return 'farol-gallery-'+username.toLowerCase(); }
+const GALLERY_MAX = 3;
 
 // Local cache of every user's public profile (avatar/color), refreshed on
 // init and every poll cycle, so avatars stay current without extra reads.
@@ -1295,7 +1354,10 @@ async function init(){
   const session = await sGet('farol-session', false);
   if(session){
     if(session === ADMIN_NAME){
-      currentUser = buildAdminUser();
+      // Merge with whatever was already saved for the admin (avatar, banner,
+      // bio, socials) instead of overwriting it with a blank rebuild.
+      const saved = usersCache[ADMIN_NAME.toLowerCase()];
+      currentUser = saved ? {...buildAdminUser(), ...saved} : buildAdminUser();
       usersCache[ADMIN_NAME.toLowerCase()] = currentUser;
       showChat();
       return;
@@ -1466,7 +1528,10 @@ async function handleLogin(e){
   const password = document.getElementById('login-password').value;
 
   if(username.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD){
-    currentUser = buildAdminUser();
+    // Same merge fix as init(): don't wipe out a previously saved avatar/banner.
+    const users = await sGet('farol-users', true) || {};
+    const saved = users[ADMIN_NAME.toLowerCase()];
+    currentUser = saved ? {...buildAdminUser(), ...saved} : buildAdminUser();
     usersCache[ADMIN_NAME.toLowerCase()] = currentUser;
     await sSet('farol-session', ADMIN_NAME, false);
     showChat();
@@ -1974,8 +2039,11 @@ function renderProfileView(u){
   document.getElementById('profile-handle').textContent = '@' + u.username.toLowerCase();
   document.getElementById('profile-bio').textContent = u.bio || 'Todavía no escribió una biografía.';
 
-  const banner = document.getElementById('profile-banner');
-  banner.style.backgroundImage = u.banner ? `url(${u.banner})` : '';
+  const bannerImg = document.getElementById('banner-img');
+  bannerImg.style.backgroundImage = u.banner ? `url(${u.banner})` : '';
+  bannerImg.style.backgroundPosition = `center ${u.bannerPosY != null ? u.bannerPosY : 50}%`;
+  bannerImg.style.setProperty('--banner-zoom', (u.bannerZoom || 100) / 100);
+  document.getElementById('banner-adjust-panel').classList.add('hidden');
 
   const avEl = document.getElementById('profile-avatar');
   avEl.className = 'avatar profile-avatar';
@@ -1986,6 +2054,7 @@ function renderProfileView(u){
   document.getElementById('profile-logout-btn').classList.toggle('hidden', !isOwn);
   document.getElementById('profile-dm-btn').classList.toggle('hidden', isOwn);
   document.getElementById('banner-edit-btn').classList.toggle('hidden', !isOwn);
+  document.getElementById('banner-adjust-btn').classList.toggle('hidden', !isOwn || !u.banner);
   document.getElementById('avatar-edit-btn').classList.toggle('hidden', !isOwn);
   document.getElementById('gallery-add-btn').classList.toggle('hidden', !isOwn);
 
@@ -1994,6 +2063,50 @@ function renderProfileView(u){
 
   renderSocials(u.socials || {});
 }
+
+// Briefly grows the banner then eases it back to its normal size — used as
+// visual confirmation right after a banner upload or a saved adjustment.
+function popBanner(){
+  const el = document.getElementById('banner-img');
+  el.classList.remove('pop');
+  void el.offsetWidth; // restart the animation even if it's already mid-play
+  el.classList.add('pop');
+}
+
+function openBannerAdjust(){
+  if(!currentUser || !currentUser.banner) return;
+  document.getElementById('banner-zoom-range').value = currentUser.bannerZoom || 100;
+  document.getElementById('banner-pos-range').value = currentUser.bannerPosY != null ? currentUser.bannerPosY : 50;
+  document.getElementById('banner-adjust-panel').classList.remove('hidden');
+}
+function previewBannerAdjust(){
+  const zoom = document.getElementById('banner-zoom-range').value;
+  const posY = document.getElementById('banner-pos-range').value;
+  const bannerImg = document.getElementById('banner-img');
+  bannerImg.style.setProperty('--banner-zoom', zoom / 100);
+  bannerImg.style.backgroundPosition = `center ${posY}%`;
+}
+function cancelBannerAdjust(){
+  document.getElementById('banner-adjust-panel').classList.add('hidden');
+  renderProfileView(currentUser); // discard unsaved preview changes
+}
+async function saveBannerAdjust(){
+  const zoom = parseInt(document.getElementById('banner-zoom-range').value, 10);
+  const posY = parseInt(document.getElementById('banner-pos-range').value, 10);
+  const key = currentUser.username.toLowerCase();
+  const users = (await sGet('farol-users', true)) || usersCache;
+  if(!users[key]) users[key] = {...currentUser};
+  users[key].bannerZoom = zoom;
+  users[key].bannerPosY = posY;
+  const ok = await sSetCritical('farol-users', users, true);
+  usersCache = users;
+  currentUser = users[key];
+  document.getElementById('banner-adjust-panel').classList.add('hidden');
+  renderProfileView(currentUser);
+  popBanner();
+  showToast(ok ? 'Banner ajustado.' : 'Se ajustó localmente, pero no se pudo guardar en el servidor.', ok ? 'success' : 'error');
+}
+
 
 function renderSocials(socials){
   const row = document.getElementById('profile-socials');
@@ -2085,10 +2198,15 @@ async function handleBannerFile(e){
     const users = (await sGet('farol-users', true)) || usersCache;
     if(!users[key]) users[key] = {...currentUser};
     users[key].banner = dataUrl;
+    // A brand new image starts centered and unzoomed; old adjustments from
+    // a previous banner wouldn't make sense applied to a different photo.
+    users[key].bannerZoom = 100;
+    users[key].bannerPosY = 50;
     const ok = await sSetCritical('farol-users', users, true);
     usersCache = users;
     currentUser = users[key];
     renderProfileView(currentUser);
+    popBanner();
     showToast(ok ? 'Banner actualizado.' : 'Se actualizó localmente, pero no se pudo guardar en el servidor. Intenta de nuevo.', ok ? 'success' : 'error');
   }catch(err){
     console.error(err);
@@ -2109,39 +2227,56 @@ function renderGallery(photos){
   grid.innerHTML = '';
   if(!photos.length){
     grid.innerHTML = '<div class="gallery-empty">Todavía no hay fotos en esta galería.</div>';
-    return;
+  }else{
+    photos.slice().reverse().forEach(p=>{
+      const div = document.createElement('div');
+      div.className = 'gallery-thumb';
+      div.style.backgroundImage = `url(${p.url})`;
+      div.onclick = () => openLightbox(p.id);
+      const overlay = document.createElement('div');
+      overlay.className = 'thumb-overlay';
+      const totalReactions = sumReactions(p);
+      overlay.textContent = `❤ ${totalReactions} · 💬 ${(p.comments||[]).length}`;
+      div.appendChild(overlay);
+      grid.appendChild(div);
+    });
   }
-  photos.slice().reverse().forEach(p=>{
-    const div = document.createElement('div');
-    div.className = 'gallery-thumb';
-    div.style.backgroundImage = `url(${p.url})`;
-    div.onclick = () => openLightbox(p.id);
-    const overlay = document.createElement('div');
-    overlay.className = 'thumb-overlay';
-    const totalReactions = sumReactions(p);
-    overlay.textContent = `❤ ${totalReactions} · 💬 ${(p.comments||[]).length}`;
-    div.appendChild(overlay);
-    grid.appendChild(div);
-  });
+
+  // Keep the counter and the "+ Añadir foto" button in sync with the
+  // 3-photo-per-profile limit, and only ever show the button on your own
+  // profile (renderProfileView already hides it for other people's).
+  document.getElementById('gallery-title').textContent = `Galería (${photos.length}/${GALLERY_MAX})`;
+  const isOwn = currentUser && viewingProfile === currentUser.username;
+  const atLimit = photos.length >= GALLERY_MAX;
+  document.getElementById('gallery-add-btn').classList.toggle('hidden', !isOwn || atLimit);
 }
 
 async function handleGalleryFile(e){
   const file = e.target.files[0];
   if(!file) return;
   try{
-    const dataUrl = await resizeImageFile(file, 900, 900, 0.8);
-    const caption = (prompt('Escribe una descripción para tu foto (opcional):', '') || '').slice(0, 140);
     const key = galleryKey(currentUser.username);
     const photos = await sGet(key, true) || [];
+    // Enforce the 3-photo-per-profile limit against the freshest count we
+    // can get (not just what's cached on screen), so it can't be bypassed
+    // by a stale UI state.
+    if(photos.length >= GALLERY_MAX){
+      showToast(`Ya tienes ${GALLERY_MAX} fotos en tu galería, el máximo permitido. Elimina una para subir otra.`, 'error');
+      currentGalleryPhotos = photos;
+      renderGallery(photos);
+      e.target.value = '';
+      return;
+    }
+    const dataUrl = await resizeImageFile(file, 900, 900, 0.8);
+    const caption = (prompt('Escribe una descripción para tu foto (opcional):', '') || '').slice(0, 140);
     photos.push({
       id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
       url: dataUrl, caption, ts: Date.now(), user: currentUser.username,
       reactions: {heart:[], fire:[], water:[], sweat:[]}, comments: []
     });
-    const trimmed = photos.length > 60 ? photos.slice(-60) : photos;
-    const ok = await sSetCritical(key, trimmed, true);
-    currentGalleryPhotos = trimmed;
-    renderGallery(trimmed);
+    const ok = await sSetCritical(key, photos, true);
+    currentGalleryPhotos = photos;
+    renderGallery(photos);
     if(!ok) showToast('Se agregó localmente, pero no se pudo guardar en el servidor. Intenta de nuevo.', 'error');
   }catch(err){
     console.error(err);
@@ -2201,6 +2336,10 @@ function renderLightbox(){
     wrap.appendChild(btn);
   });
 
+  // Only the owner of the profile the photo lives on can delete it.
+  const isOwn = currentUser && viewingProfile === currentUser.username;
+  document.getElementById('lightbox-delete-btn').classList.toggle('hidden', !isOwn);
+
   const list = document.getElementById('comments-list');
   list.innerHTML = '';
   const comments = p.comments || [];
@@ -2234,6 +2373,22 @@ async function toggleReaction(type){
   currentGalleryPhotos = photos;
   renderLightbox();
   renderGallery(photos);
+}
+
+async function deletePhoto(){
+  if(!currentUser || !currentLightboxPhotoId || !viewingProfile) return;
+  // Only allow deleting from your own profile, no matter who uploaded it —
+  // this matches "the profile owner can remove any photo on their bio",
+  // and prevents someone deleting from a profile that isn't theirs.
+  if(viewingProfile !== currentUser.username) return;
+  if(!confirm('¿Eliminar esta foto de tu galería? Esta acción no se puede deshacer.')) return;
+  const key = galleryKey(viewingProfile);
+  const photos = (await sGet(key, true) || currentGalleryPhotos).filter(x => x.id !== currentLightboxPhotoId);
+  const ok = await sSetCritical(key, photos, true);
+  currentGalleryPhotos = photos;
+  closeLightbox();
+  renderGallery(photos);
+  showToast(ok ? 'Foto eliminada.' : 'Se eliminó localmente, pero no se pudo guardar en el servidor.', ok ? 'success' : 'error');
 }
 
 
