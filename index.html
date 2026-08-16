@@ -276,6 +276,13 @@
   .modal-actions{display:flex;gap:10px;margin-top:16px;}
   .btn-ghost{flex:1;background:transparent;border:1px solid rgba(255,255,255,.12);color:var(--text-muted);border-radius:10px;padding:10px 0;cursor:pointer;font-weight:600;}
   .modal-actions .btn-primary{flex:1;margin-top:0;}
+  .btn-danger{
+    flex:1;background:var(--accent-coral);color:#2b0618;border:none;
+    border-radius:10px;padding:10px 0;font-weight:600;font-size:14px;cursor:pointer;
+    transition:filter .15s;font-family:'Inter',sans-serif;
+  }
+  .btn-danger:hover{filter:brightness(1.1);}
+  .btn-danger:disabled{opacity:.6;cursor:not-allowed;}
 
   /* ---------- CHAT VIEW ---------- */
   #view-chat{height:100%;display:flex;flex-direction:column;}
@@ -590,8 +597,20 @@
   .admin-users{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;}
   .admin-user-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--bg-panel);}
   .admin-user-row .avatar{width:28px;height:28px;font-size:11px;}
+  .admin-user-name-row{display:flex;align-items:center;gap:6px;min-width:0;}
   .admin-user-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .admin-user-email{font-size:11px;color:var(--text-muted);}
+  .admin-user-email{font-size:11px;color:var(--text-muted);margin-left:14px;}
+  .status-dot{
+    width:8px;height:8px;border-radius:50%;flex:0 0 auto;
+  }
+  .status-dot.online{background:var(--accent-mint);box-shadow:0 0 6px 1px var(--accent-mint);}
+  .status-dot.offline{background:var(--text-muted);opacity:.5;}
+  .admin-user-delete{
+    flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:transparent;
+    border:1px solid rgba(255,255,255,.1);color:var(--text-muted);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:12px;transition:.15s;
+  }
+  .admin-user-delete:hover{background:rgba(255,61,107,.12);border-color:rgba(255,61,107,.4);color:var(--accent-coral);}
   .msg-delete-btn{
     background:rgba(0,0,0,.35);border:none;color:var(--text-muted);cursor:pointer;
     font-size:12px;border-radius:8px;padding:4px 6px;opacity:0;transition:opacity .15s, color .15s;
@@ -1117,6 +1136,18 @@
       <div class="admin-section">
         <div class="sidebar-h" style="margin:0 0 10px;">Moderation</div>
         <p class="admin-hint">Wenn du mit dem Cursor über eine Nachricht in einem Raum fährst, siehst du eine 🗑️-Schaltfläche zum Löschen.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DELETE USER CONFIRM ===================== -->
+  <div id="delete-user-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeDeleteUserModal()">
+    <div class="modal">
+      <h3>Benutzer löschen?</h3>
+      <div class="sub">Bist du sicher, dass du <strong id="delete-user-name"></strong> löschen willst? Profil, Bilder und Galerie werden endgültig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.</div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeDeleteUserModal()">Abbrechen</button>
+        <button class="btn-danger" id="delete-user-confirm-btn" onclick="executeDeleteUser()">Endgültig löschen</button>
       </div>
     </div>
   </div>
@@ -2025,19 +2056,38 @@ async function openAdminPanel(){
       const row = document.createElement('div');
       row.className = 'admin-user-row';
       const av = buildAvatarEl(u.username, 'avatar-sm');
+      const isActive = online[u.username] && (now - online[u.username].lastSeen <= ONLINE_TTL);
       const info = document.createElement('div');
       info.style.flex = '1';
       info.style.minWidth = '0';
+      const nameRow = document.createElement('div');
+      nameRow.className = 'admin-user-name-row';
+      const statusDot = document.createElement('span');
+      statusDot.className = 'status-dot' + (isActive ? ' online' : ' offline');
+      statusDot.title = isActive ? 'Aktiv' : 'Getrennt';
       const name = document.createElement('div');
       name.className = 'admin-user-name';
       name.textContent = u.username;
+      nameRow.appendChild(statusDot);
+      nameRow.appendChild(name);
       const email = document.createElement('div');
       email.className = 'admin-user-email';
       email.textContent = u.email || u.provider || '—';
-      info.appendChild(name);
+      info.appendChild(nameRow);
       info.appendChild(email);
       row.appendChild(av);
       row.appendChild(info);
+      // El admin no puede borrarse a sí mismo desde este panel.
+      if(u.username !== ADMIN_NAME){
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn-icon admin-user-delete';
+        delBtn.title = 'Benutzer löschen';
+        delBtn.setAttribute('aria-label', 'Benutzer löschen');
+        delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+        delBtn.onclick = () => confirmDeleteUser(u.username);
+        row.appendChild(delBtn);
+      }
       list.appendChild(row);
     });
   }
@@ -2046,6 +2096,61 @@ async function openAdminPanel(){
 }
 function closeAdminPanel(){
   document.getElementById('admin-modal').classList.add('hidden');
+}
+
+/* ---------------- ADMIN: BENUTZER LÖSCHEN ---------------- */
+let userPendingDelete = null;
+
+function confirmDeleteUser(username){
+  if(!currentUser || !currentUser.isAdmin) return;
+  userPendingDelete = username;
+  document.getElementById('delete-user-name').textContent = username;
+  document.getElementById('delete-user-modal').classList.remove('hidden');
+}
+function closeDeleteUserModal(){
+  document.getElementById('delete-user-modal').classList.add('hidden');
+  userPendingDelete = null;
+}
+
+async function executeDeleteUser(){
+  if(!currentUser || !currentUser.isAdmin || !userPendingDelete) return;
+  const username = userPendingDelete;
+  const key = username.toLowerCase();
+  const btn = document.getElementById('delete-user-confirm-btn');
+  btn.disabled = true;
+
+  try{
+    // 1) Sacarlo del documento compartido de usuarios.
+    const users = await sGet('farol-users', true) || {};
+    delete users[key];
+    await sSet('farol-users', users, true);
+    usersCache = users;
+
+    // 2) Borrar sus documentos propios (avatar, banner, galería).
+    await Promise.all([
+      sDelete(avatarKey(username), true).catch(()=>{}),
+      sDelete(bannerKey(username), true).catch(()=>{}),
+      sDelete(galleryKey(username), true).catch(()=>{})
+    ]);
+
+    // 3) Sacarlo de la lista de "en línea" si estaba ahí.
+    const online = await sGet('farol-online', true) || {};
+    if(online[username]){
+      delete online[username];
+      await sSet('farol-online', online, true);
+    }
+
+    delete avatarCache[key];
+    delete bannerCache[key];
+
+    showToast(`Benutzer "${username}" wurde gelöscht.`, 'success');
+    closeDeleteUserModal();
+    openAdminPanel();
+  }catch(err){
+    console.error('Benutzer konnte nicht gelöscht werden', err);
+    showToast('Der Benutzer konnte nicht gelöscht werden. Versuche es erneut.', 'error');
+  }
+  btn.disabled = false;
 }
 
 /* ---------------- ONLINE / PRESENCE ---------------- */
