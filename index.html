@@ -447,7 +447,8 @@
     border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px 12px;font-size:12px;cursor:pointer;
     display:inline-flex;align-items:center;gap:5px;user-select:none;z-index:3;
   }
-  .profile-head{display:flex;align-items:flex-end;gap:14px;padding:0 24px;margin-top:-40px;position:relative;flex-wrap:wrap;}
+  .profile-head{display:flex;flex-direction:column;gap:12px;padding:0 24px 2px;margin-top:-40px;position:relative;}
+  .profile-head-top{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;}
   .profile-avatar-wrap{position:relative;flex:0 0 auto;}
   .profile-avatar{width:88px;height:88px;font-size:28px;border:4px solid var(--bg-card);background-color:var(--bg-card-2);}
   .avatar-edit-btn{
@@ -455,17 +456,18 @@
     border-radius:50%;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
     user-select:none;z-index:3;
   }
-  .profile-head-info{flex:1;padding-bottom:8px;min-width:0;}
-  .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;}
+  .profile-head-info{flex:1 1 140px;padding-bottom:8px;min-width:140px;}
+  .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .profile-handle{font-size:12.5px;color:var(--text-muted);}
-  .profile-edit-toggle{width:auto;padding:8px 16px;margin-bottom:8px;font-size:13px;}
+  .profile-head-actions{display:flex;flex-wrap:wrap;gap:8px;}
+  .profile-edit-toggle{width:auto;padding:8px 16px;font-size:13px;}
   .profile-logout-btn{
-    width:auto;flex:0 0 auto;margin-bottom:8px;font-size:16px;
+    width:auto;flex:0 0 auto;font-size:16px;
     border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 10px;
-    color:var(--accent-coral);
+    color:var(--accent-coral);display:inline-flex;align-items:center;justify-content:center;
   }
   .profile-logout-btn:hover{background:rgba(255,61,107,.1);border-color:rgba(255,61,107,.4);}
-  .profile-dm-btn{width:auto;padding:8px 16px;margin-bottom:8px;font-size:13px;display:inline-flex;align-items:center;gap:7px;}
+  .profile-dm-btn{width:auto;padding:8px 16px;font-size:13px;display:inline-flex;align-items:center;gap:7px;}
   .profile-body{padding:18px 24px 26px;}
   .profile-bio{font-size:13.5px;color:var(--text-cream);line-height:1.6;margin:6px 0 18px;white-space:pre-wrap;}
   .social-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
@@ -968,18 +970,22 @@
       </div>
 
       <div class="profile-head">
-        <div class="profile-avatar-wrap">
-          <div class="avatar profile-avatar" id="profile-avatar"></div>
-          <input type="file" id="avatar-file" accept="image/*" class="hidden-file" onchange="handleAvatarFile(event)">
-          <label class="avatar-edit-btn hidden" id="avatar-edit-btn" for="avatar-file">📷</label>
+        <div class="profile-head-top">
+          <div class="profile-avatar-wrap">
+            <div class="avatar profile-avatar" id="profile-avatar"></div>
+            <input type="file" id="avatar-file" accept="image/*" class="hidden-file" onchange="handleAvatarFile(event)">
+            <label class="avatar-edit-btn hidden" id="avatar-edit-btn" for="avatar-file">📷</label>
+          </div>
+          <div class="profile-head-info">
+            <div class="profile-name" id="profile-name"></div>
+            <div class="profile-handle" id="profile-handle"></div>
+          </div>
         </div>
-        <div class="profile-head-info">
-          <div class="profile-name" id="profile-name"></div>
-          <div class="profile-handle" id="profile-handle"></div>
+        <div class="profile-head-actions">
+          <button class="btn-primary profile-edit-toggle hidden" id="profile-edit-toggle" onclick="toggleProfileEdit()">Editar perfil</button>
+          <button class="btn-icon profile-logout-btn hidden" id="profile-logout-btn" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión"><i class="fa-solid fa-power-off"></i></button>
+          <button class="btn-primary profile-dm-btn hidden" id="profile-dm-btn" onclick="startPrivateChat()"><i class="fa-solid fa-comment-dots"></i> Chat privado</button>
         </div>
-        <button class="btn-primary profile-edit-toggle hidden" id="profile-edit-toggle" onclick="toggleProfileEdit()">Editar perfil</button>
-        <button class="btn-icon profile-logout-btn hidden" id="profile-logout-btn" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">⏻</button>
-        <button class="btn-primary profile-dm-btn hidden" id="profile-dm-btn" onclick="startPrivateChat()"><i class="fa-solid fa-comment-dots"></i> Chat privado</button>
       </div>
 
       <div class="profile-body">
@@ -1303,16 +1309,26 @@ function applyAvatarStyle(el, username){
   }
 }
 function paintAvatarEl(el, username, avatarUrl){
+  // Primero pintamos SIEMPRE el círculo de color + iniciales. Así el avatar
+  // nunca queda vacío, ni mientras se confirma la foto real ni si la URL
+  // guardada (por ejemplo un avatar viejo) resulta estar rota.
+  el.style.backgroundImage = 'none';
+  el.style.background = userLookup(username).color || colorFor(username);
+  el.textContent = initials(username);
   if(avatarUrl){
-    el.style.backgroundImage = `url(${avatarUrl})`;
-    el.style.backgroundSize = 'cover';
-    el.style.backgroundPosition = 'center';
-    el.style.background = '';
-    el.textContent = '';
-  }else{
-    el.style.backgroundImage = 'none';
-    el.style.background = userLookup(username).color || colorFor(username);
-    el.textContent = initials(username);
+    // Solo reemplazamos por la imagen una vez que confirmamos que carga.
+    const probe = new Image();
+    probe.onload = () => {
+      el.style.backgroundImage = `url(${avatarUrl})`;
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.style.background = '';
+      el.textContent = '';
+    };
+    probe.onerror = () => {
+      // URL rota: nos quedamos con el círculo de color + iniciales de arriba.
+    };
+    probe.src = avatarUrl;
   }
 }
 function buildAvatarEl(username, sizeClass){
