@@ -1259,6 +1259,22 @@ function galleryKey(username){ return 'farol-gallery-'+username.toLowerCase(); }
 // por foto, y la imagen grande se carga recién cuando se abre el lightbox.
 function galleryImgKey(photoId){ return 'farol-gallery-img-'+photoId; }
 
+// El avatar y el banner de cada usuario viven en su PROPIO documento de
+// Firestore (uno por usuario), no dentro del documento compartido
+// "farol-users" que junta a todos. Si los metiéramos ahí, ese documento
+// crecería con cada foto de perfil de la comunidad y en algún momento
+// pasaría el límite de 1 MB de Firestore — y entonces los guardados
+// empezarían a fallar en silencio para TODOS, no solo para quien subió la
+// última foto. Con un documento por usuario, cada uno tiene su propio
+// margen de 1 MB, de sobra para un avatar + banner comprimidos.
+function avatarKey(username){ return 'farol-avatar-'+username.toLowerCase(); }
+function bannerKey(username){ return 'farol-banner-'+username.toLowerCase(); }
+// Cache en memoria: undefined = todavía no se pidió, null = se pidió y no
+// hay foto, string = la imagen. Evita re-pedir a Firestore la misma foto
+// una y otra vez mientras dura la sesión.
+const avatarCache = {};
+const bannerCache = {};
+
 // Local cache of every user's public profile (avatar/color), refreshed on
 // init and every poll cycle, so avatars stay current without extra reads.
 let usersCache = {};
@@ -1272,15 +1288,30 @@ function userLookup(username){
 }
 function applyAvatarStyle(el, username){
   const u = userLookup(username);
-  if(u.avatar){
-    el.style.backgroundImage = `url(${u.avatar})`;
+  const key = username.toLowerCase();
+  // u.avatar es un resabio de versiones viejas (URL de Storage, o incluso
+  // base64 durante un momento en que probamos guardarlo en el doc
+  // compartido) — si todavía está ahí, se usa como primer vistazo mientras
+  // se confirma/reemplaza con lo que haya en el documento propio del user.
+  const known = (avatarCache[key] !== undefined) ? avatarCache[key] : u.avatar;
+  paintAvatarEl(el, username, known);
+  if(avatarCache[key] === undefined){
+    sGet(avatarKey(username), true).then(val => {
+      avatarCache[key] = val || null;
+      if(val) paintAvatarEl(el, username, val);
+    }).catch(()=>{ avatarCache[key] = null; });
+  }
+}
+function paintAvatarEl(el, username, avatarUrl){
+  if(avatarUrl){
+    el.style.backgroundImage = `url(${avatarUrl})`;
     el.style.backgroundSize = 'cover';
     el.style.backgroundPosition = 'center';
     el.style.background = '';
     el.textContent = '';
   }else{
     el.style.backgroundImage = 'none';
-    el.style.background = u.color || colorFor(username);
+    el.style.background = userLookup(username).color || colorFor(username);
     el.textContent = initials(username);
   }
 }
@@ -2025,7 +2056,17 @@ function renderProfileView(u){
   document.getElementById('profile-bio').textContent = u.bio || 'Todavía no escribió una biografía.';
 
   const banner = document.getElementById('profile-banner');
-  banner.style.backgroundImage = u.banner ? `url(${u.banner})` : '';
+  const bKey = u.username.toLowerCase();
+  const knownBanner = (bannerCache[bKey] !== undefined) ? bannerCache[bKey] : u.banner;
+  banner.style.backgroundImage = knownBanner ? `url(${knownBanner})` : '';
+  if(bannerCache[bKey] === undefined){
+    sGet(bannerKey(u.username), true).then(val => {
+      bannerCache[bKey] = val || null;
+      if(val && viewingProfile === u.username){
+        document.getElementById('profile-banner').style.backgroundImage = `url(${val})`;
+      }
+    }).catch(()=>{ bannerCache[bKey] = null; });
+  }
 
   const avEl = document.getElementById('profile-avatar');
   avEl.className = 'avatar profile-avatar';
@@ -2105,22 +2146,14 @@ async function handleAvatarFile(e){
   const file = e.target.files[0];
   if(!file) return;
   try{
-    // 220x220 en vez de 300x300, y algo menos de calidad: esta imagen se
-    // guarda como texto base64 dentro del documento compartido "farol-users"
-    // (que junta a TODOS los usuarios), así que cuanto más chica, mejor —
-    // ese documento tiene un límite de 1 MB en Firestore.
+    // 220x220 y algo menos de calidad para que el documento propio del
+    // usuario (avatar + banner) se mantenga chico y liviano de transferir.
     const dataUrl = await resizeImageFile(file, 220, 220, 0.72);
     const key = currentUser.username.toLowerCase();
-    const avatarUrl = dataUrl;
-    const users = (await sGet('farol-users', true)) || usersCache;
-    // The record for the logged-in user might be missing from what we just
-    // read back (a slow/failed earlier save, etc). Never crash on that —
-    // rebuild it from what we already know locally and keep going.
-    if(!users[key]) users[key] = {...currentUser};
-    users[key].avatar = avatarUrl;
-    const ok = await sSetCritical('farol-users', users, true);
-    usersCache = users;
-    currentUser = users[key];
+    const ok = await sSetCritical(avatarKey(currentUser.username), dataUrl, true);
+    avatarCache[key] = dataUrl;
+    currentUser.avatar = dataUrl; // solo en memoria, para esta sesión
+    if(usersCache[key]) usersCache[key].avatar = dataUrl;
     renderProfileView(currentUser);
     refreshMyAvatarUI();
     showToast(ok ? 'Foto de perfil actualizada.' : 'Se actualizó localmente, pero no se pudo guardar en el servidor. Intenta de nuevo.', ok ? 'success' : 'error');
@@ -2135,17 +2168,13 @@ async function handleBannerFile(e){
   const file = e.target.files[0];
   if(!file) return;
   try{
-    // Igual que el avatar: más chico y con más compresión porque esto ahora
-    // vive como base64 dentro del documento compartido "farol-users".
+    // Igual que el avatar: chico y comprimido, y en su propio documento.
     const dataUrl = await resizeImageFile(file, 760, 260, 0.62);
     const key = currentUser.username.toLowerCase();
-    const bannerUrl = dataUrl;
-    const users = (await sGet('farol-users', true)) || usersCache;
-    if(!users[key]) users[key] = {...currentUser};
-    users[key].banner = bannerUrl;
-    const ok = await sSetCritical('farol-users', users, true);
-    usersCache = users;
-    currentUser = users[key];
+    const ok = await sSetCritical(bannerKey(currentUser.username), dataUrl, true);
+    bannerCache[key] = dataUrl;
+    currentUser.banner = dataUrl; // solo en memoria, para esta sesión
+    if(usersCache[key]) usersCache[key].banner = dataUrl;
     renderProfileView(currentUser);
     showToast(ok ? 'Banner actualizado.' : 'Se actualizó localmente, pero no se pudo guardar en el servidor. Intenta de nuevo.', ok ? 'success' : 'error');
   }catch(err){
