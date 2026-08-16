@@ -1216,6 +1216,7 @@ async function sSetCritical(key, value, shared, attempts){
       }
       return true;
     }catch(e){
+      console.error('sSetCritical failed for', key, e);
       if(i < attempts-1) await new Promise(r=>setTimeout(r, 500*(i+1)));
     }
   }
@@ -1298,6 +1299,13 @@ let usersCache = {};
 async function refreshUsersCache(){
   const users = await sGet('farol-users', true);
   if(users) usersCache = users;
+  // Never let a background refresh clobber what we know locally about
+  // ourselves. If our own avatar/banner/bio was just saved (or is still
+  // mid-save, or the server save failed), our own currentUser object is
+  // always the freshest, most correct truth about us — a stale poll should
+  // never make our own profile picture "disappear" a few seconds after we
+  // set it.
+  if(currentUser) usersCache[currentUser.username.toLowerCase()] = currentUser;
 }
 function userLookup(username){
   if(username === ADMIN_NAME) return usersCache[ADMIN_NAME.toLowerCase()] || buildAdminUser();
