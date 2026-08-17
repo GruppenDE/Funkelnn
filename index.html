@@ -1007,6 +1007,10 @@
           <div class="brand-mark-sm"><img class="logo-img" alt="Funkeln"></div>
           <div class="brand">Funkeln</div>
         </div>
+        <div class="room-title hidden" id="dm-title" onclick="toggleRoomsSidebar()" style="cursor:pointer;" title="Räume öffnen">
+          <span id="active-room-name">💬 <span id="dm-partner-name"></span></span>
+          <span class="desc">Privater Chat</span>
+        </div>
       </div>
       <div class="topbar-right">
         <button class="btn-icon admin-btn hidden" id="chat-admin-btn" onclick="openAdminPanel()" title="Admin-Panel" aria-label="Admin-Panel">👑</button>
@@ -1245,6 +1249,7 @@ const ONLINE_TTL = 30000;
 
 let currentUser = null;
 let currentRoom = 'general';
+let dmPartner = null; // username of the person we're DMing, or null when in a normal room
 let currentView = 'lobby'; // 'lobby' | 'chat'
 let pollTimer = null;
 let heartbeatTimer = null;
@@ -1624,6 +1629,8 @@ async function backToLobby(){
   document.getElementById('view-lobby').classList.remove('hidden');
   document.getElementById('view-lobby').classList.add('view-fade');
   currentView = 'lobby';
+  dmPartner = null;
+  document.getElementById('dm-title').classList.add('hidden');
   closeSidebars();
   document.getElementById('lobby-grid').dataset.painted = '0';
   await renderLobby();
@@ -1783,6 +1790,8 @@ function renderRoomList(){
 
 async function selectRoom(id){
   currentRoom = id;
+  dmPartner = null;
+  document.getElementById('dm-title').classList.add('hidden');
   const room = ROOMS.find(r=>r.id===id);
   renderRoomList();
   closeSidebars();
@@ -2274,9 +2283,40 @@ async function openProfile(username){
   document.getElementById('profile-modal').classList.remove('hidden');
   await loadGallery(u.username);
 }
-function startPrivateChat(){
-  if(!viewingProfile) return;
-  showToast(`Private Chats mit ${viewingProfile} sind bald verfügbar.`);
+// Builds a stable, order-independent room id for a DM between two users,
+// so both people land in the exact same "room" no matter who opens it first.
+function dmRoomId(a, b){
+  return 'dm__' + [a.toLowerCase(), b.toLowerCase()].sort().join('__');
+}
+
+async function startPrivateChat(){
+  if(!viewingProfile || !currentUser) return;
+  if(viewingProfile === currentUser.username){
+    showToast('Du kannst keinen privaten Chat mit dir selbst starten.');
+    return;
+  }
+  await openDirectChat(viewingProfile);
+}
+
+// Opens a 1:1 conversation, reusing the same message pipeline as the group
+// rooms (loadMessages/queueMessage/persistMessage are all room-id agnostic).
+async function openDirectChat(otherUsername){
+  dmPartner = otherUsername;
+  currentRoom = dmRoomId(currentUser.username, otherUsername);
+  closeProfile();
+  closeSidebars();
+
+  document.getElementById('view-lobby').classList.add('hidden');
+  document.getElementById('view-chat').classList.remove('hidden');
+  document.getElementById('view-chat').classList.add('view-fade');
+  currentView = 'chat';
+
+  document.getElementById('dm-partner-name').textContent = otherUsername;
+  document.getElementById('dm-title').classList.remove('hidden');
+  renderRoomList(); // no ROOMS entry matches a dm__ id, so nothing shows as "active" — correct
+
+  await loadMessages();
+  document.getElementById('msg-input').focus();
 }
 function closeProfile(){
   document.getElementById('profile-modal').classList.add('hidden');
