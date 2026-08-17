@@ -363,6 +363,12 @@
     0%,100%{box-shadow:0 0 0 1px var(--border-glow), 0 0 14px -6px var(--accent-amber);}
     50%{box-shadow:0 0 0 1px var(--border-glow), 0 0 22px -2px var(--accent-amber);}
   }
+  .room-card.is-special{
+    background:linear-gradient(160deg, var(--bg-card) 0%, rgba(255,46,156,.14) 100%);
+    border-color:rgba(255,46,156,.45);
+    animation:glowpulse 2.4s ease-in-out infinite;
+  }
+  .room-card.is-special .room-name{color:var(--accent-amber);}
   .room-emoji{
     width:36px;height:36px;border-radius:11px 11px 11px 3px;background:var(--bg-card-2);
     display:flex;align-items:center;justify-content:center;font-size:29px;flex:0 0 auto;
@@ -772,6 +778,40 @@
     opacity:0;transform:translateX(-4px);transition:all .2s ease;
   }
   .lobby-card:hover .lobby-enter{opacity:1;transform:translateX(0);color:var(--accent-amber);}
+
+  /* ---- Special "premium" card (Chatte mit Valeria) ---- */
+  .lobby-card.is-special{
+    background:linear-gradient(160deg, var(--bg-card) 0%, rgba(255,46,156,.14) 100%);
+    border:1px solid rgba(255,46,156,.45);
+    box-shadow:0 0 0 1px rgba(255,46,156,.25), 0 16px 34px -14px rgba(255,46,156,.55);
+    animation:specialGlow 2.4s ease-in-out infinite;
+  }
+  .lobby-card.is-special:hover{
+    border-color:var(--accent-amber);
+    box-shadow:0 0 0 1px var(--accent-amber), 0 20px 40px -14px rgba(255,46,156,.7);
+  }
+  @keyframes specialGlow{
+    0%,100%{box-shadow:0 0 0 1px rgba(255,46,156,.25), 0 16px 34px -14px rgba(255,46,156,.45);}
+    50%{box-shadow:0 0 0 1px rgba(255,46,156,.65), 0 16px 40px -10px rgba(255,46,156,.85);}
+  }
+  .lobby-card.is-special::before{
+    content:'';position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(120deg, transparent 20%, rgba(255,255,255,.35) 42%, rgba(255,46,156,.5) 48%, transparent 65%);
+    background-size:250% 250%;
+    animation:specialShine 2.6s ease-in-out infinite;
+    mix-blend-mode:overlay;
+  }
+  @keyframes specialShine{
+    0%{background-position:130% 0%;}
+    100%{background-position:-30% 100%;}
+  }
+  .lobby-card.is-special .lobby-emoji{
+    box-shadow:0 0 14px 2px rgba(255,46,156,.55);
+  }
+  .lobby-card.is-special .lobby-card-name{color:var(--accent-amber);}
+  .lobby-card.is-special .lobby-live{
+    background:rgba(255,46,156,.16);color:var(--accent-amber);
+  }
 
   /* view transitions */
   @keyframes fadeInUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
@@ -1346,7 +1386,7 @@ const ROOMS = [
   {id:'cine', icon:'img', name:'Frankfurt', desc:'Wolkenkratzer und Finanzrhythmus', capacity:35},
   {id:'gaming', icon:'img', name:'Stuttgart', desc:'Wiege des Motors und der Ingenieurskunst', capacity:40},
   {id:'deportes', icon:'img', name:'Köln', desc:'Der Dom und der rheinische Frohsinn', capacity:35},
-  {id:'general', icon:'img', name:'Chatte mit Valeria', desc:'Märkte, Geschichte und Tradition', capacity:60, link:'https://www.google.com'},
+  {id:'general', icon:'img', name:'Chatte mit Valeria', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://www.google.com', special:true},
 ];
 // Salas cuyo icono es la nueva imagen de banderas de Alemania (todas menos
 // "+18", que conserva su emoji 🔞) usan esta función para no repetir el
@@ -1793,7 +1833,7 @@ async function renderLobby(){
     const level = fullnessLevel(pct);
 
     const card = document.createElement('div');
-    card.className = 'lobby-card' + (isFirstPaint ? ' reveal' : '');
+    card.className = 'lobby-card' + (isFirstPaint ? ' reveal' : '') + (r.special ? ' is-special' : '');
     if(isFirstPaint) card.style.animationDelay = (i * 0.06) + 's';
     // Las tarjetas con "link" son botones de enlace externo: no entran a
     // una sala de chat, solo redirigen a la URL indicada en una pestaña nueva.
@@ -1802,11 +1842,15 @@ async function renderLobby(){
     card.innerHTML = r.link ? `
       <div class="lobby-card-top">
         <div class="lobby-emoji">${roomIconHtml(r)}</div>
+        <div class="lobby-live is-live"><span class="live-dot"></span>Live</div>
       </div>
       <div class="lobby-card-name">${r.name}</div>
       <div class="lobby-card-desc">${r.desc}</div>
+      <div class="lobby-meter">
+        <div class="lobby-meter-fill level-hot" style="width:99%"></div>
+      </div>
       <div class="lobby-meter-row">
-        <span></span>
+        <span class="lobby-pct level-hot">99% voll</span>
         <span class="lobby-enter">Öffnen →</span>
       </div>` : `
       <div class="lobby-card-top">
@@ -1995,7 +2039,7 @@ function renderRoomList(){
   list.innerHTML = '';
   ROOMS.forEach(r=>{
     const el = document.createElement('div');
-    el.className = 'room-card' + (r.id===currentRoom ? ' active' : '');
+    el.className = 'room-card' + (r.id===currentRoom ? ' active' : '') + (r.special ? ' is-special' : '');
     // Las tarjetas con "link" son botones de enlace externo: no abren la
     // sala de chat, solo redirigen a la URL indicada en una pestaña nueva.
     if(r.link){
