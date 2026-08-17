@@ -1585,7 +1585,17 @@ window.addEventListener('DOMContentLoaded', init);
 // todos) recibe "Missing or insufficient permissions" al intentar mandar
 // un mensaje, porque su escritura llega sin auth.
 async function ensureFirebaseAuth(){
+  // Justo después de un refresh, Firebase todavía no ha restaurado la sesión
+  // persistida (admin/Google) — auth.currentUser puede aparecer como null
+  // por un instante aunque exista una sesión guardada. Si en ese momento
+  // llamamos signInAnonymously(), creamos una sesión anónima nueva y
+  // pisamos la sesión real antes de que termine de restaurarse. Por eso
+  // esperamos primero el primer evento real de onAuthStateChanged.
   if(auth.currentUser) return auth.currentUser;
+  const restoredUser = await new Promise(resolve => {
+    const unsub = auth.onAuthStateChanged(user => { unsub(); resolve(user); });
+  });
+  if(restoredUser) return restoredUser;
   try{
     const cred = await auth.signInAnonymously();
     return cred.user;
@@ -1619,9 +1629,21 @@ async function init(){
       showAuth();
       return;
     }
-    const users = await sGet('farol-users', true) || {};
-    const u = users[session.toLowerCase()];
-    if(u){ currentUser = u; usersCache[session.toLowerCase()] = u; showChat(); return; }
+    // Reintenta unas veces: justo después de crear una sesión anónima nueva,
+    // Firestore puede rechazar la primera lectura con un permission-denied
+    // pasajero mientras esa sesión se propaga. Sin reintento, ese error se
+    // confunde con "el usuario no existe" y manda a la persona al login
+    // aunque su sesión en localStorage siga siendo válida.
+    let users = null;
+    for(let attempt = 0; attempt < 3; attempt++){
+      const res = await sGetSafe('farol-users', true);
+      if(res.ok){ users = res.value || {}; break; }
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+    }
+    if(users){
+      const u = users[session.toLowerCase()];
+      if(u){ currentUser = u; usersCache[session.toLowerCase()] = u; showChat(); return; }
+    }
   }
   showAuth();
 }
