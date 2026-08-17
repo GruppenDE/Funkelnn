@@ -313,7 +313,7 @@
   .btn-icon{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:17px;padding:6px;border-radius:8px;}
   .btn-icon:hover{background:var(--bg-card);color:var(--text-cream);}
   .online-toggle{
-    display:none;position:relative;align-items:center;justify-content:center;
+    display:flex;position:relative;align-items:center;justify-content:center;
     width:38px;height:38px;font-size:15px;border-radius:11px;
     background:var(--bg-card);border:1px solid rgba(255,255,255,.08);color:var(--text-cream);
   }
@@ -803,7 +803,6 @@
       transform:translateX(110%);transition:transform .25s ease;
     }
     .sidebar-online.open{transform:translateX(0);}
-    .online-toggle{display:flex;}
     .msg{max-width:85%;}
   }
   @media (max-width:480px){
