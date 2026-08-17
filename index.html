@@ -1678,6 +1678,35 @@ function paintAvatarEl(el, username, avatarUrl){
     probe.src = avatarUrl;
   }
 }
+// Espera a que una URL de avatar termine de cargar en el navegador (y la
+// marca como confirmada) sin bloquear nunca por una foto rota.
+function preloadAvatarImage(url){
+  return new Promise((resolve)=>{
+    if(!url || confirmedAvatarUrls.has(url)){ resolve(); return; }
+    const img = new Image();
+    img.onload = () => { confirmedAvatarUrls.add(url); resolve(); };
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}
+function delay(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+// Antes de dibujar una lista de mensajes (o de usuarios en línea), nos
+// aseguramos de tener ya el avatar de cada quien listo y confirmado. Así,
+// cuando esa lista se pinta por primera vez, la foto ya está disponible y
+// no hace falta mostrar "iniciales" como paso intermedio (que es lo que
+// causaba el parpadeo). Tiene un tope de tiempo para no trabar el chat si
+// la red anda lenta: en ese caso simplemente se pinta con lo que haya.
+async function preloadAvatarsFor(usernames){
+  const uniqueKeys = Array.from(new Set(usernames.map(u => u.toLowerCase())));
+  const work = Promise.all(uniqueKeys.map(async key => {
+    if(avatarCache[key] === undefined){
+      try{ avatarCache[key] = (await sGet(avatarKey(key), true)) || null; }
+      catch(e){ avatarCache[key] = null; }
+    }
+    if(avatarCache[key]) await preloadAvatarImage(avatarCache[key]);
+  }));
+  await Promise.race([work, delay(2000)]);
+}
 function buildAvatarEl(username, sizeClass){
   const el = document.createElement('div');
   el.className = 'avatar clickable' + (sizeClass ? ' '+sizeClass : '');
@@ -2113,6 +2142,10 @@ async function loadMessages(){
   if(remote.ok){
     const merged = mergeMessages(local, remote.value || []);
     roomCache[room] = merged;
+    // Precargamos los avatares de quienes escribieron en esta sala antes
+    // de repintar con la lista definitiva, para que las fotos ya estén
+    // listas en este mismo repintado (sin el parpadeo de iniciales).
+    await preloadAvatarsFor(merged.map(m => m.user));
     if(room === currentRoom) renderMessages(merged);
   }
 }
@@ -2710,7 +2743,13 @@ function attachActiveRoomListener(room){
     try{ val = snap.exists ? (JSON.parse(snap.data().value || '[]') || []) : []; }
     catch(e){ val = []; }
     roomCache[room] = mergeMessages(roomCache[room] || [], val);
-    if(room === currentRoom) renderMessages(roomCache[room]);
+    const msgs = roomCache[room];
+    // Precargamos los avatares antes de repintar (si ya estaban listos de
+    // antes, esto resuelve al instante y no se nota ninguna demora); así
+    // evitamos el parpadeo de iniciales cuando llega un mensaje nuevo.
+    preloadAvatarsFor(msgs.map(m => m.user)).then(() => {
+      if(room === currentRoom) renderMessages(roomCache[room]);
+    });
     // dmPartner is only set when this DM is genuinely mine (not an
     // admin spectating someone else's conversation) — see openDirectChat
     // vs openDirectChatByUsers.
