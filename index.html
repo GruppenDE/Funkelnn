@@ -1605,6 +1605,29 @@ const bannerCache = {};
 // etc.) — si ya sabemos que la imagen carga, la pintamos directo.
 const confirmedAvatarUrls = new Set();
 
+// avatarCache y confirmedAvatarUrls viven solo en memoria, así que se
+// vacían cada vez que se refresca la página — por eso el avatar tardaba en
+// aparecer después de un F5 (había que volver a pedirlo a Firestore antes
+// de poder pintarlo). Esta segunda capa de caché SÍ sobrevive al refresh
+// porque vive en localStorage: guardamos ahí la última foto confirmada de
+// cada usuario, así se puede pintar de entrada apenas carga la página,
+// mientras en segundo plano se confirma/actualiza contra Firestore.
+function avatarLocalCacheKey(username){ return 'farol-avatar-local-'+username.toLowerCase(); }
+function getLocalAvatarCache(username){
+  try{ return localStorage.getItem(avatarLocalCacheKey(username)); }
+  catch(e){ return null; }
+}
+function setLocalAvatarCache(username, dataUrl){
+  try{
+    if(dataUrl) localStorage.setItem(avatarLocalCacheKey(username), dataUrl);
+    else localStorage.removeItem(avatarLocalCacheKey(username));
+  }catch(e){
+    // localStorage lleno o no disponible: no es crítico, seguimos sin caché
+    // local para este usuario (se resuelve igual vía Firestore, solo que
+    // más lento en el próximo refresh).
+  }
+}
+
 // Local cache of every user's public profile (avatar/color), refreshed on
 // init and every poll cycle, so avatars stay current without extra reads.
 let usersCache = {};
@@ -1628,12 +1651,23 @@ function applyAvatarStyle(el, username){
   // base64 durante un momento en que probamos guardarlo en el doc
   // compartido) — si todavía está ahí, se usa como primer vistazo mientras
   // se confirma/reemplaza con lo que haya en el documento propio del user.
-  const known = (avatarCache[key] !== undefined) ? avatarCache[key] : u.avatar;
+  let known = (avatarCache[key] !== undefined) ? avatarCache[key] : u.avatar;
+  // Si esta sesión todavía no pidió el avatar (recién refrescada la
+  // página), probamos primero con lo último que quedó guardado en
+  // localStorage de una sesión anterior — así la foto aparece de una,
+  // en vez de mostrar iniciales hasta que vuelva la respuesta de Firestore.
+  if(avatarCache[key] === undefined){
+    const cached = getLocalAvatarCache(key);
+    if(cached) known = cached;
+  }
   paintAvatarEl(el, username, known);
   if(avatarCache[key] === undefined){
     sGet(avatarKey(username), true).then(val => {
       avatarCache[key] = val || null;
-      if(val) paintAvatarEl(el, username, val);
+      setLocalAvatarCache(key, val || null);
+      // Solo repintamos si es distinto de lo que ya mostramos (evita un
+      // parpadeo innecesario cuando la foto de localStorage ya era la buena).
+      if(val && val !== known) paintAvatarEl(el, username, val);
     }).catch(()=>{ avatarCache[key] = null; });
   }
 }
@@ -1700,8 +1734,23 @@ async function preloadAvatarsFor(usernames){
   const uniqueKeys = Array.from(new Set(usernames.map(u => u.toLowerCase())));
   const work = Promise.all(uniqueKeys.map(async key => {
     if(avatarCache[key] === undefined){
-      try{ avatarCache[key] = (await sGet(avatarKey(key), true)) || null; }
-      catch(e){ avatarCache[key] = null; }
+      // Camino rápido: si de una sesión anterior quedó una foto guardada en
+      // localStorage, la usamos ya mismo (sin esperar a Firestore) y
+      // confirmamos/actualizamos en segundo plano sin bloquear el pintado.
+      const cached = getLocalAvatarCache(key);
+      if(cached !== null){
+        avatarCache[key] = cached;
+        sGet(avatarKey(key), true).then(val => {
+          avatarCache[key] = val || null;
+          setLocalAvatarCache(key, val || null);
+        }).catch(()=>{});
+      }else{
+        try{
+          avatarCache[key] = (await sGet(avatarKey(key), true)) || null;
+          setLocalAvatarCache(key, avatarCache[key]);
+        }
+        catch(e){ avatarCache[key] = null; }
+      }
     }
     if(avatarCache[key]) await preloadAvatarImage(avatarCache[key]);
   }));
@@ -3092,6 +3141,7 @@ async function handleAvatarFile(e){
     const key = currentUser.username.toLowerCase();
     const ok = await sSetCritical(avatarKey(currentUser.username), dataUrl, true);
     avatarCache[key] = dataUrl;
+    setLocalAvatarCache(key, dataUrl);
     currentUser.avatar = dataUrl; // solo en memoria, para esta sesión
     if(usersCache[key]) usersCache[key].avatar = dataUrl;
     renderProfileView(currentUser);
