@@ -1599,6 +1599,11 @@ function bannerKey(username){ return 'farol-banner-'+username.toLowerCase(); }
 // una y otra vez mientras dura la sesión.
 const avatarCache = {};
 const bannerCache = {};
+// URLs de avatar que ya confirmamos que cargan bien en esta sesión. Sirve
+// para no repintar "iniciales -> foto" cada vez que se vuelve a dibujar la
+// lista de mensajes o de usuarios en línea (cada poll, cada mensaje nuevo,
+// etc.) — si ya sabemos que la imagen carga, la pintamos directo.
+const confirmedAvatarUrls = new Set();
 
 // Local cache of every user's public profile (avatar/color), refreshed on
 // init and every poll cycle, so avatars stay current without extra reads.
@@ -1633,6 +1638,18 @@ function applyAvatarStyle(el, username){
   }
 }
 function paintAvatarEl(el, username, avatarUrl){
+  // Si esta URL de avatar ya se confirmó como válida en esta sesión, la
+  // pintamos directo — sin pasar primero por "iniciales" — para no
+  // parpadear cada vez que se vuelve a dibujar la lista de mensajes/en
+  // línea (poll cada 3s, cada mensaje nuevo, etc.).
+  if(avatarUrl && confirmedAvatarUrls.has(avatarUrl)){
+    el.style.backgroundImage = `url(${avatarUrl})`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.backgroundColor = '';
+    el.textContent = '';
+    return;
+  }
   // Primero pintamos SIEMPRE el círculo de color + iniciales. Así el avatar
   // nunca queda vacío, ni mientras se confirma la foto real ni si la URL
   // guardada (por ejemplo un avatar viejo) resulta estar rota.
@@ -1643,6 +1660,7 @@ function paintAvatarEl(el, username, avatarUrl){
     // Solo reemplazamos por la imagen una vez que confirmamos que carga.
     const probe = new Image();
     probe.onload = () => {
+      confirmedAvatarUrls.add(avatarUrl);
       el.style.backgroundImage = `url(${avatarUrl})`;
       el.style.backgroundSize = 'cover';
       el.style.backgroundPosition = 'center';
