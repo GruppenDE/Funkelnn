@@ -1748,9 +1748,14 @@ function paintAvatarEl(el, username, avatarUrl){
   // línea (poll cada 3s, cada mensaje nuevo, etc.).
   if(avatarUrl && confirmedAvatarUrls.has(avatarUrl)){
     el.style.backgroundImage = `url(${avatarUrl})`;
-    el.style.backgroundSize = 'cover';
+    // 'contain' (en vez de 'cover') muestra la foto completa sin recortar
+    // ningún borde; como el contenedor es cuadrado/circular, dejamos el
+    // color del usuario de fondo para rellenar el espacio que quede libre
+    // arriba/abajo o a los costados cuando la foto no es cuadrada.
+    el.style.backgroundSize = 'contain';
+    el.style.backgroundRepeat = 'no-repeat';
     el.style.backgroundPosition = 'center';
-    el.style.backgroundColor = '';
+    el.style.backgroundColor = userLookup(username).color || colorFor(username);
     el.textContent = '';
     return;
   }
@@ -1766,14 +1771,19 @@ function paintAvatarEl(el, username, avatarUrl){
     probe.onload = () => {
       confirmedAvatarUrls.add(avatarUrl);
       el.style.backgroundImage = `url(${avatarUrl})`;
-      el.style.backgroundSize = 'cover';
+      // 'contain' muestra la foto completa (sin recortar) en vez de
+      // 'cover', que recortaba los bordes para llenar el círculo.
+      el.style.backgroundSize = 'contain';
+      el.style.backgroundRepeat = 'no-repeat';
       el.style.backgroundPosition = 'center';
       // IMPORTANT: never assign el.style.background = '' here — "background"
       // is the shorthand property, and clearing it also wipes out the
       // backgroundImage we just set two lines above (that was the actual
-      // bug making the avatar photo disappear). backgroundColor is the
-      // correct longhand to clear on its own.
-      el.style.backgroundColor = '';
+      // bug making the avatar photo disappear). backgroundColor es la forma
+      // correcta de fijar/limpiar solo el color de fondo. Con 'contain'
+      // puede quedar espacio libre en el círculo (fotos no cuadradas), así
+      // que dejamos el color del usuario en vez de dejarlo transparente.
+      el.style.backgroundColor = userLookup(username).color || colorFor(username);
       el.textContent = '';
     };
     probe.onerror = () => {
