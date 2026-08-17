@@ -1422,6 +1422,17 @@ let dmIndexUnsub = null;
 let dmReadsUnsub = null;
 let activeRoomUnsub = null; // realtime listener for whatever room is currently open
 
+// refreshDmBadge() se dispara desde varios lugares a la vez (el poll, el
+// listener del índice de chats, el listener de "leídos"...) y cada una de
+// esas llamadas hace su propio trabajo async, así que no siempre terminan
+// en el mismo orden en que arrancaron. Sin esto, una llamada vieja que
+// tardó más en resolver puede pisar en el DOM el resultado de una llamada
+// más nueva que ya había terminado — eso es lo que se veía como "aparece
+// un número y después se borra". Con este contador, cada llamada se
+// identifica con un número creciente y, al terminar, solo actualiza el
+// DOM si sigue siendo la más reciente en curso; si ya la superó una
+// llamada posterior, descarta su resultado en silencio.
+let dmBadgeRequestId = 0;
 /* ---------------- STORAGE HELPERS (Firebase Firestore) ---------------- */
 // This app only ever calls these with shared=false for 'farol-session',
 // a purely local "who's logged in on this device/browser" value — that one
@@ -1626,6 +1637,33 @@ function setLocalAvatarCache(username, dataUrl){
     // local para este usuario (se resuelve igual vía Firestore, solo que
     // más lento en el próximo refresh).
   }
+}
+
+// Mismo problema, otra cara: el número de chats privados sin leer también
+// se calcula recién después de ir y volver a Firestore, así que en un
+// refresh el badge arrancaba en "0/oculto" durante un instante y después
+// saltaba al valor real (o al revés). Guardamos el último valor correcto
+// conocido en localStorage para pintarlo de una al cargar, sin esperar.
+function dmBadgeLocalCacheKey(username){ return 'farol-dm-badge-local-'+username.toLowerCase(); }
+function getLocalDmBadgeCount(username){
+  try{
+    const raw = localStorage.getItem(dmBadgeLocalCacheKey(username));
+    return raw === null ? null : parseInt(raw, 10) || 0;
+  }catch(e){ return null; }
+}
+function setLocalDmBadgeCount(username, count){
+  try{ localStorage.setItem(dmBadgeLocalCacheKey(username), String(count)); }
+  catch(e){ /* no crítico */ }
+}
+function paintDmBadgeFromLocalCache(username){
+  const cached = getLocalDmBadgeCount(username);
+  if(cached === null) return;
+  ['dm-list-badge-lobby','dm-list-badge-chat'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = cached > 99 ? '99+' : String(cached);
+    el.classList.toggle('hidden', cached === 0);
+  });
 }
 
 // Local cache of every user's public profile (avatar/color), refreshed on
@@ -1890,6 +1928,7 @@ async function showChat(){
   document.getElementById('lobby-admin-btn').classList.toggle('hidden', !currentUser.isAdmin);
   document.getElementById('chat-admin-btn').classList.toggle('hidden', !currentUser.isAdmin);
   refreshMyAvatarUI();
+  paintDmBadgeFromLocalCache(currentUser.username);
   currentView = 'lobby';
   startHeartbeat();
   startDmRealtime();
@@ -2833,12 +2872,15 @@ async function fetchDmChats(){
 // no per-message fetch.
 async function refreshDmBadge(){
   if(!currentUser) return;
+  const requestId = ++dmBadgeRequestId;
   try{
     const chats = await fetchDmChats();
     let reads = myDmReadsCache;
     if(!reads || Object.keys(reads).length === 0){
       reads = await getMyDmReads();
-      myDmReadsCache = reads;
+      // Otra llamada más nueva ya pudo haber puesto algo más fresco en
+      // myDmReadsCache mientras esperábamos esto — no la pisamos.
+      if(requestId === dmBadgeRequestId) myDmReadsCache = reads;
     }
     const meLower = currentUser.username.toLowerCase();
     let unreadChats = 0;
@@ -2850,6 +2892,11 @@ async function refreshDmBadge(){
         unreadChats++;
       }
     });
+    // Si mientras calculábamos esto ya arrancó (o incluso terminó) una
+    // llamada más nueva, este resultado quedó desactualizado: lo tiramos
+    // en vez de pintarlo en el DOM.
+    if(requestId !== dmBadgeRequestId) return;
+    setLocalDmBadgeCount(currentUser.username, unreadChats);
     ['dm-list-badge-lobby','dm-list-badge-chat'].forEach(id=>{
       const el = document.getElementById(id);
       if(!el) return;
