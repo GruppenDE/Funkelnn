@@ -1565,7 +1565,27 @@ function resizeImageFile(file, maxW, maxH, quality){
 /* ---------------- INIT ---------------- */
 window.addEventListener('DOMContentLoaded', init);
 
+// Asegura que SIEMPRE haya una sesión de Firebase Authentication activa
+// (aunque sea anónima) antes de tocar Firestore. Esto es necesario porque
+// nuestro login "manual" (usuario/contraseña guardados en Firestore) no
+// crea ninguna sesión real de Firebase Auth, y las reglas de seguridad de
+// Firestore exigen request.auth != null para poder escribir. Sin esto,
+// cualquier usuario que se registró/logueó de forma manual (o sea, casi
+// todos) recibe "Missing or insufficient permissions" al intentar mandar
+// un mensaje, porque su escritura llega sin auth.
+async function ensureFirebaseAuth(){
+  if(auth.currentUser) return auth.currentUser;
+  try{
+    const cred = await auth.signInAnonymously();
+    return cred.user;
+  }catch(e){
+    console.error('No se pudo crear una sesión anónima de Firebase Auth', e);
+    return null;
+  }
+}
+
 async function init(){
+  await ensureFirebaseAuth();
   renderRoomList();
   await refreshUsersCache();
   const session = await sGet('farol-session', false);
