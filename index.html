@@ -482,10 +482,13 @@
   }
   .banner-edit-btn:hover{background:rgba(10,10,20,.75);}
   .banner-pos-btn{right:auto;left:14px;}
+  .banner-delete-btn{top:14px;bottom:auto;right:14px;background:rgba(220,53,69,.75);}
+  .banner-delete-btn:hover{background:rgba(220,53,69,.92);}
   @media (max-width:480px){
     .banner-edit-btn{font-size:11px;padding:5px 9px;}
     .banner-pos-btn{left:10px;}
     #banner-edit-btn{right:10px;}
+    .banner-delete-btn{top:10px;right:10px;}
   }
   .banner-position-frame{
     position:relative;width:100%;height:150px;overflow:hidden;border-radius:var(--radius-md);
@@ -504,6 +507,12 @@
     border-radius:50%;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
     user-select:none;z-index:3;
   }
+  .avatar-delete-btn{
+    position:absolute;bottom:0;left:0;background:var(--accent-coral);color:#fff;border:2px solid var(--bg-card);
+    border-radius:50%;width:28px;height:28px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    user-select:none;z-index:3;
+  }
+  .avatar-delete-btn:hover{filter:brightness(1.12);}
   .profile-head-info{flex:1 1 140px;padding-bottom:8px;min-width:140px;}
   .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .profile-handle{font-size:12.5px;color:var(--text-muted);}
@@ -583,6 +592,15 @@
     color:#fff;font-size:11px;padding:10px 8px 6px;opacity:0;transition:opacity .15s;
   }
   .gallery-thumb:hover .thumb-overlay{opacity:1;}
+  .thumb-delete-btn{
+    position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;
+    background:rgba(10,10,20,.68);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:11px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s;z-index:2;
+  }
+  .gallery-thumb:hover .thumb-delete-btn{opacity:1;}
+  /* En pantallas táctiles no hay :hover, así que el botón queda visible
+     siempre — si no, no habría forma de verlo para poder tocarlo. */
+  @media (hover:none){ .thumb-delete-btn{opacity:1;} }
   .gallery-empty{grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:12.5px;padding:24px 0;}
   #edit-bio{
     width:100%;background:var(--bg-void);border:1px solid rgba(255,255,255,.08);border-radius:10px;
@@ -665,6 +683,11 @@
   }
   .lightbox-img{width:58%;object-fit:cover;background:#000;}
   .lightbox-side{width:42%;display:flex;flex-direction:column;padding:20px;min-height:0;}
+  .lightbox-delete-btn{
+    flex:0 0 auto;width:auto;align-self:flex-start;padding:6px 12px;font-size:12px;
+    color:var(--accent-coral);border-color:rgba(255,61,107,.35);margin:2px 0 14px;
+  }
+  .lightbox-delete-btn:hover{background:rgba(255,61,107,.1);border-color:rgba(255,61,107,.55);}
   .lightbox-caption{font-size:13.5px;color:var(--text-cream);margin-bottom:10px;}
   .lightbox-like-row{margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;}
   .reaction-btn{
@@ -1205,6 +1228,7 @@
       <div class="profile-banner" id="profile-banner">
         <input type="file" id="banner-file" accept="image/*" class="hidden-file" onchange="handleBannerFile(event)">
         <button type="button" class="banner-edit-btn banner-pos-btn hidden" id="banner-pos-btn" onclick="openBannerPositionModal()">🎯 Position anpassen</button>
+        <button type="button" class="banner-edit-btn banner-delete-btn hidden" id="banner-delete-btn" onclick="confirmDeleteBanner()">🗑️ Entfernen</button>
         <label class="banner-edit-btn hidden" id="banner-edit-btn" for="banner-file">📷 Banner ändern</label>
       </div>
 
@@ -1213,7 +1237,8 @@
           <div class="profile-avatar-wrap">
             <div class="avatar profile-avatar" id="profile-avatar"></div>
             <input type="file" id="avatar-file" accept="image/*" class="hidden-file" onchange="handleAvatarFile(event)">
-            <label class="avatar-edit-btn hidden" id="avatar-edit-btn" for="avatar-file">📷</label>
+            <label class="avatar-edit-btn hidden" id="avatar-edit-btn" for="avatar-file" title="Profilbild ändern">📷</label>
+            <button type="button" class="avatar-delete-btn hidden" id="avatar-delete-btn" onclick="confirmDeleteAvatar()" title="Profilbild entfernen" aria-label="Profilbild entfernen">🗑️</button>
           </div>
           <div class="profile-head-info">
             <div class="profile-name" id="profile-name"></div>
@@ -1325,6 +1350,7 @@
       <img id="lightbox-img" class="lightbox-img" alt="Foto">
       <div class="lightbox-side">
         <div class="lightbox-caption" id="lightbox-caption"></div>
+        <button type="button" class="btn-ghost lightbox-delete-btn hidden" id="lightbox-delete-btn" onclick="confirmDeleteGalleryPhoto(currentLightboxPhotoId)">🗑️ Foto löschen</button>
         <div class="lightbox-like-row" id="lightbox-reactions"></div>
         <div class="comments-list" id="comments-list"></div>
         <form class="comment-form" onsubmit="handleAddComment(event)">
@@ -3096,6 +3122,10 @@ function renderProfileView(u){
       bannerCache[bKey] = val || null;
       if(val && viewingProfile === u.username){
         document.getElementById('profile-banner').style.backgroundImage = `url(${val})`;
+        if(currentUser && currentUser.username === u.username){
+          document.getElementById('banner-pos-btn').classList.remove('hidden');
+          document.getElementById('banner-delete-btn').classList.remove('hidden');
+        }
       }
     }).catch(()=>{ bannerCache[bKey] = null; });
   }
@@ -3106,6 +3136,15 @@ function renderProfileView(u){
   const avEl = document.getElementById('profile-avatar');
   avEl.className = 'avatar profile-avatar';
   applyAvatarStyle(avEl, u.username);
+  const aKey = u.username.toLowerCase();
+  let knownAvatar = (avatarCache[aKey] !== undefined) ? avatarCache[aKey] : (u.avatar || getLocalAvatarCache(aKey));
+  if(avatarCache[aKey] === undefined){
+    sGet(avatarKey(u.username), true).then(val => {
+      if(viewingProfile === u.username){
+        document.getElementById('avatar-delete-btn').classList.toggle('hidden', !(currentUser && currentUser.username === u.username && val));
+      }
+    }).catch(()=>{});
+  }
 
   const isOwn = currentUser && currentUser.username === u.username;
   document.getElementById('profile-edit-toggle').classList.toggle('hidden', !isOwn);
@@ -3113,7 +3152,9 @@ function renderProfileView(u){
   document.getElementById('profile-dm-btn').classList.toggle('hidden', isOwn);
   document.getElementById('banner-edit-btn').classList.toggle('hidden', !isOwn);
   document.getElementById('banner-pos-btn').classList.toggle('hidden', !(isOwn && knownBanner));
+  document.getElementById('banner-delete-btn').classList.toggle('hidden', !(isOwn && knownBanner));
   document.getElementById('avatar-edit-btn').classList.toggle('hidden', !isOwn);
+  document.getElementById('avatar-delete-btn').classList.toggle('hidden', !(isOwn && knownAvatar));
   document.getElementById('gallery-add-btn').classList.toggle('hidden', !isOwn);
 
   document.getElementById('profile-view-mode').classList.remove('hidden');
@@ -3201,6 +3242,52 @@ async function handleAvatarFile(e){
   e.target.value = '';
 }
 
+async function confirmDeleteAvatar(){
+  if(!currentUser) return;
+  if(!confirm('Möchtest du dein Profilbild wirklich entfernen?')) return;
+  const key = currentUser.username.toLowerCase();
+  try{
+    await sDelete(avatarKey(currentUser.username), true);
+    avatarCache[key] = null;
+    setLocalAvatarCache(key, null);
+    currentUser.avatar = null;
+    if(usersCache[key]) usersCache[key].avatar = null;
+    renderProfileView(currentUser);
+    refreshMyAvatarUI();
+    showToast('Profilbild entfernt.', 'success');
+  }catch(err){
+    console.error(err);
+    showToast('Das Profilbild konnte nicht entfernt werden. Versuche es erneut.', 'error');
+  }
+}
+
+async function confirmDeleteBanner(){
+  if(!currentUser) return;
+  if(!confirm('Möchtest du deinen Banner wirklich entfernen?')) return;
+  const key = currentUser.username.toLowerCase();
+  try{
+    await sDelete(bannerKey(currentUser.username), true);
+    bannerCache[key] = null;
+    currentUser.banner = null;
+    currentUser.bannerPos = null;
+    // bannerPos vive dentro del documento compartido "farol-users", así
+    // que hay que limpiarlo ahí también para que un futuro banner no
+    // arranque con una posición vieja aplicada.
+    const users = await sGet('farol-users', true) || usersCache;
+    if(users[key]){
+      users[key].banner = null;
+      delete users[key].bannerPos;
+      await sSet('farol-users', users, true);
+      usersCache = users;
+    }
+    renderProfileView(currentUser);
+    showToast('Banner entfernt.', 'success');
+  }catch(err){
+    console.error(err);
+    showToast('Der Banner konnte nicht entfernt werden. Versuche es erneut.', 'error');
+  }
+}
+
 function applyBannerPosition(el, posStr){
   el.style.backgroundPosition = posStr || '50% 50%';
 }
@@ -3209,8 +3296,13 @@ async function handleBannerFile(e){
   const file = e.target.files[0];
   if(!file) return;
   try{
-    // Igual que el avatar: chico y comprimido, y en su propio documento.
-    const dataUrl = await resizeImageFile(file, 760, 260, 0.62);
+    // El banner se ve grande en pantalla (hasta 520px de ancho, y más
+    // todavía en pantallas retina/HiDPI, que piden 2x o 3x esos píxeles
+    // para verse nítidas). 760x260 al 62% de calidad se quedaba corto para
+    // eso y se notaba pixelado/borroso. Subimos resolución y calidad —
+    // banner.jpg sigue siendo liviano (tiene su propio documento en
+    // Firestore, con hasta 1 MB de margen) pero ahora se ve nítido.
+    const dataUrl = await resizeImageFile(file, 1200, 420, 0.85);
     const key = currentUser.username.toLowerCase();
     const ok = await sSetCritical(bannerKey(currentUser.username), dataUrl, true);
     bannerCache[key] = dataUrl;
@@ -3357,6 +3449,17 @@ function renderGallery(photos){
     const totalReactions = sumReactions(p);
     overlay.textContent = `❤ ${totalReactions} · 💬 ${(p.comments||[]).length}`;
     div.appendChild(overlay);
+    const canDelete = currentUser && (currentUser.isAdmin || currentUser.username === viewingProfile);
+    if(canDelete){
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'thumb-delete-btn';
+      delBtn.title = 'Foto löschen';
+      delBtn.setAttribute('aria-label', 'Foto löschen');
+      delBtn.textContent = '🗑️';
+      delBtn.onclick = (ev) => { ev.stopPropagation(); confirmDeleteGalleryPhoto(p.id); };
+      div.appendChild(delBtn);
+    }
     grid.appendChild(div);
   });
 }
@@ -3400,6 +3503,30 @@ async function handleGalleryFile(e){
     showToast('Das Foto konnte nicht hochgeladen werden. Versuche es mit einem kleineren Bild.', 'error');
   }
   e.target.value = '';
+}
+
+async function confirmDeleteGalleryPhoto(photoId){
+  if(!photoId || !currentUser || !viewingProfile) return;
+  const canDelete = currentUser.isAdmin || currentUser.username === viewingProfile;
+  if(!canDelete) return;
+  if(!confirm('Möchtest du dieses Foto wirklich löschen?')) return;
+  try{
+    const key = galleryKey(viewingProfile);
+    const photos = await sGet(key, true) || currentGalleryPhotos;
+    const remaining = photos.filter(x => x.id !== photoId);
+    const ok = await sSetCritical(key, remaining, true);
+    // Borramos también el documento propio con la foto en tamaño completo,
+    // así no queda huérfano ocupando espacio en Firestore.
+    sDelete(galleryImgKey(photoId), true).catch(()=>{});
+    delete fullPhotoCache[photoId];
+    currentGalleryPhotos = remaining;
+    if(currentLightboxPhotoId === photoId) closeLightbox();
+    renderGallery(remaining);
+    showToast(ok ? 'Foto gelöscht.' : 'Lokal gelöscht, konnte aber nicht auf dem Server gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
+  }catch(err){
+    console.error(err);
+    showToast('Das Foto konnte nicht gelöscht werden. Versuche es erneut.', 'error');
+  }
 }
 
 // Cache en memoria (no persistida) de las fotos completas ya cargadas en
@@ -3448,6 +3575,8 @@ function renderLightbox(){
   if(!p) return;
   document.getElementById('lightbox-img').src = fullPhotoCache[p.id] || p.thumb || p.url;
   document.getElementById('lightbox-caption').textContent = p.caption || '';
+  const canDelete = currentUser && (currentUser.isAdmin || currentUser.username === viewingProfile);
+  document.getElementById('lightbox-delete-btn').classList.toggle('hidden', !canDelete);
 
   const reactions = getReactions(p);
   const wrap = document.getElementById('lightbox-reactions');
