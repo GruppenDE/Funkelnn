@@ -603,6 +603,12 @@
   .dm-list-title{font-family:'Fredoka';font-weight:600;font-size:18px;}
   .dm-list-sub{color:var(--text-muted);font-size:12.5px;margin-top:2px;}
   .dm-list-items{display:flex;flex-direction:column;gap:6px;}
+  .dm-unread-badge{
+    min-width:20px;height:20px;padding:0 6px;border-radius:10px;
+    background:var(--accent-amber);color:#2b0618;font-size:11px;font-weight:700;
+    line-height:20px;text-align:center;margin-left:auto;flex:0 0 auto;
+  }
+  .dm-row-unread .online-name{font-weight:700;color:var(--text-cream);}
   .admin-user-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--bg-panel);}
   .admin-user-row .avatar{width:28px;height:28px;font-size:11px;}
   .admin-user-name-row{display:flex;align-items:center;gap:6px;min-width:0;}
@@ -1277,10 +1283,18 @@ const ONLINE_TTL = 30000;
 
 let currentUser = null;
 let currentRoom = 'general';
-let dmPartner = null; // username of the person we're DMing, or null when in a normal room
+let dmPartner = null; // username of the person we're DMing, or null when in a normal room / admin-spectating
 let currentView = 'lobby'; // 'lobby' | 'chat'
 let pollTimer = null;
 let heartbeatTimer = null;
+// Realtime state for private chats: a live cache of the shared DM index,
+// a live cache of "what have I read" (per-DM timestamps), and unsubscribe
+// handles for the Firestore listeners that keep both current in real time.
+let dmIndexCache = {};
+let myDmReadsCache = {};
+let dmIndexUnsub = null;
+let dmReadsUnsub = null;
+let activeRoomUnsub = null; // realtime listener for whatever room is currently open
 
 /* ---------------- STORAGE HELPERS (Firebase Firestore) ---------------- */
 // This app only ever calls these with shared=false for 'farol-session',
@@ -1316,6 +1330,27 @@ async function sSet(key, value, shared){
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
   }catch(e){ console.error('firestore set failed', key, e); }
+}
+// Atomic read-modify-write for a shared doc, used wherever two people could
+// plausibly write to the same key around the same time (like the private
+// chats index, updated on every DM sent by anyone). Plain sGet-then-sSet
+// would risk one write silently clobbering the other; a transaction can't.
+async function sTransact(key, mutator){
+  const ref = kvDocRef(key);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    let value = null;
+    if(snap.exists){
+      try{ value = JSON.parse(snap.data().value || 'null'); }catch(e){ value = null; }
+    }
+    const result = mutator(value);
+    const newValue = (result === undefined) ? value : result;
+    tx.set(ref, {
+      value: JSON.stringify(newValue),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return newValue;
+  });
 }
 // For saves that matter (profile photo/banner) — retries a few times with a
 // short backoff instead of giving up on the first hiccup, and tells the
@@ -1584,6 +1619,7 @@ async function showChat(){
   refreshMyAvatarUI();
   currentView = 'lobby';
   startHeartbeat();
+  startDmRealtime();
   await renderLobby();
   startPolling();
 }
@@ -1659,6 +1695,7 @@ async function backToLobby(){
   currentView = 'lobby';
   dmPartner = null;
   document.getElementById('dm-title').classList.add('hidden');
+  detachActiveRoomListener();
   closeSidebars();
   document.getElementById('lobby-grid').dataset.painted = '0';
   await renderLobby();
@@ -1788,6 +1825,7 @@ async function signInWithGoogle(){
 /* ---------------- LOGOUT ---------------- */
 async function logout(){
   clearInterval(pollTimer); clearInterval(heartbeatTimer);
+  stopAllRealtime();
   const online = await sGet('farol-online', true) || {};
   delete online[currentUser.username];
   await sSet('farol-online', online, true);
@@ -1796,6 +1834,8 @@ async function logout(){
     try{ await auth.signOut(); }catch(e){ console.warn('Firebase Auth-Sitzung konnte nicht beendet werden', e); }
   }
   currentUser = null;
+  dmIndexCache = {};
+  myDmReadsCache = {};
   currentView = 'lobby';
   document.getElementById('view-lobby').classList.add('hidden');
   document.getElementById('view-chat').classList.add('hidden');
@@ -1824,6 +1864,7 @@ async function selectRoom(id){
   renderRoomList();
   closeSidebars();
   await loadMessages();
+  attachActiveRoomListener(id);
   document.getElementById('msg-input').focus();
 }
 
@@ -2324,54 +2365,182 @@ function dmRoomId(a, b){
    here, so we keep a small shared index doc (id -> {users, lastTs,
    lastText, lastUser}) that every DM registers itself into. This is what
    powers the "all private chats" icon for both regular users (their own
-   chats) and the admin (every chat in the system, for oversight). */
+   chats) and the admin (every chat in the system, for oversight).
+   Both this index and each person's "last read" doc are kept live with
+   Firestore onSnapshot listeners (see startDmRealtime), so new messages
+   and unread badges show up instantly instead of waiting for the poll. */
 function dmIndexKey(){ return 'farol-dm-index'; }
+function dmReadsKey(username){ return 'farol-dm-reads-' + username.toLowerCase(); }
 
 async function ensureDmIndexEntry(userA, userB){
   const id = dmRoomId(userA, userB);
   try{
-    const idx = await sGet(dmIndexKey(), true) || {};
-    if(!idx[id]){
-      idx[id] = {id, users:[userA, userB], lastTs: Date.now(), lastText:'', lastUser:''};
-      await sSet(dmIndexKey(), idx, true);
-    }
+    const idx = await sTransact(dmIndexKey(), (current)=>{
+      const map = current || {};
+      if(!map[id]) map[id] = {id, users:[userA, userB], lastTs: Date.now(), lastText:'', lastUser:''};
+      return map;
+    });
+    dmIndexCache = idx || dmIndexCache;
+    refreshDmBadge();
   }catch(e){ console.error('No se pudo registrar el chat privado', e); }
   return id;
 }
 
 async function updateDmIndexLastMessage(room, newMsg){
   try{
-    const idx = await sGet(dmIndexKey(), true) || {};
-    const entry = idx[room] || {id: room, users: room.replace(/^dm__/,'').split('__')};
-    entry.lastTs = newMsg.ts;
-    entry.lastText = newMsg.text || (newMsg.media ? '📎 Anhang' : '');
-    entry.lastUser = newMsg.user;
-    idx[room] = entry;
-    await sSet(dmIndexKey(), idx, true);
+    const idx = await sTransact(dmIndexKey(), (current)=>{
+      const map = current || {};
+      const entry = map[room] || {id: room, users: room.replace(/^dm__/,'').split('__')};
+      entry.lastTs = newMsg.ts;
+      entry.lastText = newMsg.text || (newMsg.media ? '📎 Anhang' : '');
+      entry.lastUser = newMsg.user;
+      map[room] = entry;
+      return map;
+    });
+    dmIndexCache = idx || dmIndexCache;
   }catch(e){ console.error('No se pudo actualizar el índice de chats privados', e); }
+}
+
+async function getMyDmReads(){
+  if(!currentUser) return {};
+  try{ return (await sGet(dmReadsKey(currentUser.username), true)) || {}; }
+  catch(e){ return {}; }
+}
+
+// Records that I've seen everything in this DM up to `ts`. Updates the
+// local cache instantly (so the badge reacts right away) and persists in
+// the background.
+async function markDmRead(room, ts){
+  if(!currentUser) return;
+  ts = ts || Date.now();
+  const prevLocal = (myDmReadsCache && myDmReadsCache[room]) || 0;
+  if(ts <= prevLocal) return;
+  myDmReadsCache = myDmReadsCache || {};
+  myDmReadsCache[room] = ts;
+  refreshDmBadge();
+  try{
+    await sTransact(dmReadsKey(currentUser.username), (current)=>{
+      const map = current || {};
+      if(ts > (map[room] || 0)) map[room] = ts;
+      return map;
+    });
+  }catch(e){ console.error('No se pudo marcar como leído', e); }
+}
+
+// Keeps the DM index and my own read-state live for as long as I'm logged
+// in, so unread badges and the private-chats list update in real time
+// without needing to reopen anything.
+function startDmRealtime(){
+  if(!currentUser) return;
+  stopDmIndexListeners();
+  dmIndexUnsub = kvDocRef(dmIndexKey()).onSnapshot(snap=>{
+    try{ dmIndexCache = snap.exists ? (JSON.parse(snap.data().value || '{}') || {}) : {}; }
+    catch(e){ dmIndexCache = {}; }
+    refreshDmBadge();
+    const modal = document.getElementById('dm-list-modal');
+    if(modal && !modal.classList.contains('hidden')) renderPrivateChatsList();
+  }, err => console.error('dm index listener failed', err));
+
+  dmReadsUnsub = kvDocRef(dmReadsKey(currentUser.username)).onSnapshot(snap=>{
+    try{ myDmReadsCache = snap.exists ? (JSON.parse(snap.data().value || '{}') || {}) : {}; }
+    catch(e){ myDmReadsCache = {}; }
+    refreshDmBadge();
+    const modal = document.getElementById('dm-list-modal');
+    if(modal && !modal.classList.contains('hidden')) renderPrivateChatsList();
+  }, err => console.error('dm reads listener failed', err));
+}
+function stopDmIndexListeners(){
+  if(dmIndexUnsub){ dmIndexUnsub(); dmIndexUnsub = null; }
+  if(dmReadsUnsub){ dmReadsUnsub(); dmReadsUnsub = null; }
+}
+function stopAllRealtime(){
+  stopDmIndexListeners();
+  detachActiveRoomListener();
+}
+
+// Live listener for whichever room (group or DM) is currently open, so
+// incoming messages appear instantly instead of on the next 3s poll.
+function attachActiveRoomListener(room){
+  detachActiveRoomListener();
+  activeRoomUnsub = kvDocRef(msgKey(room)).onSnapshot(snap=>{
+    let val = [];
+    try{ val = snap.exists ? (JSON.parse(snap.data().value || '[]') || []) : []; }
+    catch(e){ val = []; }
+    roomCache[room] = mergeMessages(roomCache[room] || [], val);
+    if(room === currentRoom) renderMessages(roomCache[room]);
+    // dmPartner is only set when this DM is genuinely mine (not an
+    // admin spectating someone else's conversation) — see openDirectChat
+    // vs openDirectChatByUsers.
+    if(room.startsWith('dm__') && dmPartner && currentUser){
+      const arr = roomCache[room];
+      const lastTs = arr.length ? arr[arr.length - 1].ts : Date.now();
+      markDmRead(room, lastTs);
+    }
+  }, err => console.error('room listener failed', err));
+}
+function detachActiveRoomListener(){
+  if(activeRoomUnsub){ activeRoomUnsub(); activeRoomUnsub = null; }
 }
 
 // Regular users only see the chats they're part of; the admin sees all of
 // them, so private conversations can still be moderated.
 async function fetchDmChats(){
   if(!currentUser) return [];
-  const idx = await sGet(dmIndexKey(), true) || {};
+  let idx = dmIndexCache;
+  if(!idx || Object.keys(idx).length === 0){
+    idx = await sGet(dmIndexKey(), true) || {};
+    dmIndexCache = idx;
+  }
   const entries = Object.values(idx);
   if(currentUser.isAdmin) return entries;
   const meLower = currentUser.username.toLowerCase();
   return entries.filter(e => (e.users || []).some(u => u.toLowerCase() === meLower));
 }
 
+// Lightweight "does this chat have anything new" check, used for the
+// topbar numeral — cheap because it only needs the index + my read-state,
+// no per-message fetch.
 async function refreshDmBadge(){
   if(!currentUser) return;
   try{
     const chats = await fetchDmChats();
-    const count = chats.length;
+    let reads = myDmReadsCache;
+    if(!reads || Object.keys(reads).length === 0){
+      reads = await getMyDmReads();
+      myDmReadsCache = reads;
+    }
+    const meLower = currentUser.username.toLowerCase();
+    let unreadChats = 0;
+    chats.forEach(chat=>{
+      const isMine = (chat.users || []).some(u => u.toLowerCase() === meLower);
+      if(!isMine) return; // admin doesn't get unread badges for chats they're not part of
+      const lastRead = reads[chat.id] || 0;
+      if(chat.lastTs && chat.lastTs > lastRead && chat.lastUser && chat.lastUser.toLowerCase() !== meLower){
+        unreadChats++;
+      }
+    });
     ['dm-list-badge-lobby','dm-list-badge-chat'].forEach(id=>{
       const el = document.getElementById(id);
-      if(el) el.textContent = count;
+      if(!el) return;
+      el.textContent = unreadChats > 99 ? '99+' : String(unreadChats);
+      el.classList.toggle('hidden', unreadChats === 0);
     });
   }catch(e){ /* badge is a nice-to-have, never block on it */ }
+}
+
+// Exact unread message count for one conversation (used in the list, where
+// fetching each conversation's messages once is cheap enough).
+async function computeUnreadCount(chat){
+  const meLower = currentUser.username.toLowerCase();
+  const isMine = (chat.users || []).some(u => u.toLowerCase() === meLower);
+  if(!isMine) return 0;
+  const lastRead = (myDmReadsCache && myDmReadsCache[chat.id]) || 0;
+  if(!chat.lastTs || chat.lastTs <= lastRead) return 0;
+  let msgs = roomCache[chat.id];
+  if(!msgs){
+    try{ msgs = await sGet(msgKey(chat.id), true) || []; }catch(e){ msgs = []; }
+  }
+  return msgs.filter(m => m.ts > lastRead && m.user && m.user.toLowerCase() !== meLower).length;
 }
 
 async function openPrivateChatsList(){
@@ -2391,6 +2560,12 @@ async function renderPrivateChatsList(){
   box.innerHTML = `<div class="admin-hint">Lädt…</div>`;
   const chats = await fetchDmChats();
   chats.sort((a,b)=> (b.lastTs||0) - (a.lastTs||0));
+
+  if(!myDmReadsCache || Object.keys(myDmReadsCache).length === 0){
+    myDmReadsCache = await getMyDmReads();
+  }
+  const unreadCounts = await Promise.all(chats.map(c => computeUnreadCount(c)));
+
   box.innerHTML = '';
   refreshDmBadge();
 
@@ -2403,15 +2578,16 @@ async function renderPrivateChatsList(){
     return;
   }
 
-  chats.forEach(chat=>{
+  chats.forEach((chat, i)=>{
     const users = chat.users || [];
     const meLower = currentUser.username.toLowerCase();
     const isMine = users.some(u => u.toLowerCase() === meLower);
     const otherUser = isMine ? users.find(u => u.toLowerCase() !== meLower) : null;
     const displayName = isMine ? (otherUser || '???') : users.join(' ↔ ');
+    const unread = unreadCounts[i];
 
     const row = document.createElement('div');
-    row.className = 'online-row';
+    row.className = 'online-row' + (unread > 0 ? ' dm-row-unread' : '');
     row.style.cursor = 'pointer';
     row.onclick = () => {
       closePrivateChatsList();
@@ -2445,6 +2621,12 @@ async function renderPrivateChatsList(){
 
     row.appendChild(avatarEl);
     row.appendChild(info);
+    if(unread > 0){
+      const badge = document.createElement('div');
+      badge.className = 'dm-unread-badge';
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      row.appendChild(badge);
+    }
     box.appendChild(row);
   });
 }
@@ -2463,7 +2645,6 @@ async function startPrivateChat(){
 async function openDirectChat(otherUsername){
   dmPartner = otherUsername;
   currentRoom = dmRoomId(currentUser.username, otherUsername);
-  ensureDmIndexEntry(currentUser.username, otherUsername); // fire-and-forget: don't block opening the chat
   closeProfile();
   closeSidebars();
 
@@ -2476,7 +2657,15 @@ async function openDirectChat(otherUsername){
   document.getElementById('dm-title').classList.remove('hidden');
   renderRoomList(); // no ROOMS entry matches a dm__ id, so nothing shows as "active" — correct
 
+  // Awaited (not fire-and-forget) so the conversation is guaranteed to be
+  // registered in the shared index before anything else touches it — this
+  // is what used to let a very-fast first message race ahead and leave the
+  // chat missing from the private-chats list.
+  await ensureDmIndexEntry(currentUser.username, otherUsername);
   await loadMessages();
+  attachActiveRoomListener(currentRoom);
+  const arr = roomCache[currentRoom] || [];
+  markDmRead(currentRoom, arr.length ? arr[arr.length - 1].ts : Date.now());
   document.getElementById('msg-input').focus();
 }
 
@@ -2505,6 +2694,7 @@ async function openDirectChatByUsers(userA, userB){
   renderRoomList();
 
   await loadMessages();
+  attachActiveRoomListener(currentRoom);
   document.getElementById('msg-input').focus();
 }
 function closeProfile(){
