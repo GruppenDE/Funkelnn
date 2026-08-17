@@ -1346,7 +1346,7 @@ const ROOMS = [
   {id:'cine', icon:'img', name:'Frankfurt', desc:'Wolkenkratzer und Finanzrhythmus', capacity:35},
   {id:'gaming', icon:'img', name:'Stuttgart', desc:'Wiege des Motors und der Ingenieurskunst', capacity:40},
   {id:'deportes', icon:'img', name:'Köln', desc:'Der Dom und der rheinische Frohsinn', capacity:35},
-  {id:'general', icon:'img', name:'Nürnberg', desc:'Märkte, Geschichte und Tradition', capacity:60},
+  {id:'general', icon:'img', name:'Chatte mit Valeria', desc:'Märkte, Geschichte und Tradition', capacity:60, link:'https://www.google.com'},
 ];
 // Salas cuyo icono es la nueva imagen de banderas de Alemania (todas menos
 // "+18", que conserva su emoji 🔞) usan esta función para no repetir el
@@ -1795,9 +1795,20 @@ async function renderLobby(){
     const card = document.createElement('div');
     card.className = 'lobby-card' + (isFirstPaint ? ' reveal' : '');
     if(isFirstPaint) card.style.animationDelay = (i * 0.06) + 's';
-    card.onclick = () => enterRoom(r.id);
+    // Las tarjetas con "link" son botones de enlace externo: no entran a
+    // una sala de chat, solo redirigen a la URL indicada en una pestaña nueva.
+    card.onclick = r.link ? (() => window.open(r.link, '_blank', 'noopener')) : (() => enterRoom(r.id));
 
-    card.innerHTML = `
+    card.innerHTML = r.link ? `
+      <div class="lobby-card-top">
+        <div class="lobby-emoji">${roomIconHtml(r)}</div>
+      </div>
+      <div class="lobby-card-name">${r.name}</div>
+      <div class="lobby-card-desc">${r.desc}</div>
+      <div class="lobby-meter-row">
+        <span></span>
+        <span class="lobby-enter">Öffnen →</span>
+      </div>` : `
       <div class="lobby-card-top">
         <div class="lobby-emoji">${roomIconHtml(r)}</div>
         <div class="lobby-live ${count>0?'is-live':''}"><span class="live-dot"></span>${count} ${count===1?'Person':'Personen'}</div>
@@ -1985,7 +1996,13 @@ function renderRoomList(){
   ROOMS.forEach(r=>{
     const el = document.createElement('div');
     el.className = 'room-card' + (r.id===currentRoom ? ' active' : '');
-    el.onclick = () => selectRoom(r.id);
+    // Las tarjetas con "link" son botones de enlace externo: no abren la
+    // sala de chat, solo redirigen a la URL indicada en una pestaña nueva.
+    if(r.link){
+      el.onclick = () => window.open(r.link, '_blank', 'noopener');
+    }else{
+      el.onclick = () => selectRoom(r.id);
+    }
     el.innerHTML = `<div class="room-emoji">${roomIconHtml(r)}</div>
       <div><div class="room-name">${r.name}</div><div class="room-desc">${r.desc}</div></div>`;
     list.appendChild(el);
