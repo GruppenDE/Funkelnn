@@ -2143,6 +2143,21 @@ async function adminDeleteMessage(msgId){
 
 async function openAdminPanel(){
   if(!currentUser || !currentUser.isAdmin) return;
+
+  // Abrimos el modal YA, con un estado de carga, en vez de esperar a que
+  // terminen las lecturas de Firestore. Antes el modal permanecía
+  // invisible durante todo ese tiempo, dando la sensación de que el botón
+  // "tardaba" en reaccionar al clic.
+  const stats = document.getElementById('admin-stats');
+  const list = document.getElementById('admin-users');
+  stats.innerHTML = `
+    <div class="admin-stat"><b>—</b><span>Benutzer</span></div>
+    <div class="admin-stat"><b>${ROOMS.length}</b><span>Räume</span></div>
+    <div class="admin-stat"><b>—</b><span>Online</span></div>
+  `;
+  list.innerHTML = `<div class="admin-hint">Lade Benutzer…</div>`;
+  document.getElementById('admin-modal').classList.remove('hidden');
+
   const users = await sGet('farol-users', true) || {};
   const userList = Object.values(users);
 
@@ -2150,14 +2165,12 @@ async function openAdminPanel(){
   const now = Date.now();
   const totalOnline = Object.values(online).filter(v => now - v.lastSeen <= ONLINE_TTL).length;
 
-  const stats = document.getElementById('admin-stats');
   stats.innerHTML = `
     <div class="admin-stat"><b>${userList.length}</b><span>Benutzer</span></div>
     <div class="admin-stat"><b>${ROOMS.length}</b><span>Räume</span></div>
     <div class="admin-stat"><b>${totalOnline}</b><span>Online</span></div>
   `;
 
-  const list = document.getElementById('admin-users');
   list.innerHTML = '';
   if(userList.length === 0){
     list.innerHTML = `<div class="admin-hint">Es sind noch keine Benutzer registriert.</div>`;
@@ -2201,8 +2214,6 @@ async function openAdminPanel(){
       list.appendChild(row);
     });
   }
-
-  document.getElementById('admin-modal').classList.remove('hidden');
 }
 function closeAdminPanel(){
   document.getElementById('admin-modal').classList.add('hidden');
