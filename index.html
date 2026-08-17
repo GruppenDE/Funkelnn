@@ -801,6 +801,18 @@
   .lobby-card.is-special .lobby-live{
     background:rgba(255,46,156,.16);color:var(--accent-amber);
   }
+  /* IMPORTANTE: ".reveal" y ".is-special" definen cada una su propia
+     propiedad "animation". Como tienen la misma especificidad CSS y
+     ".is-special" viene después en la hoja de estilos, sin esta regla
+     ".is-special" se queda con TODA la propiedad "animation" y pisa por
+     completo la animación de aparición (cardIn) de ".reveal" — la tarjeta
+     de Valeria quedaba con opacity:0 y solo se volvía visible recién en el
+     siguiente repintado del lobby (varios segundos después). Esta regla,
+     con mayor especificidad (3 clases), combina ambas animaciones para que
+     la tarjeta aparezca al instante Y mantenga su brillo especial.*/
+  .lobby-card.reveal.is-special{
+    animation:cardIn .6s cubic-bezier(.16,.84,.32,1) forwards, specialGlow 2.6s ease-in-out infinite;
+  }
 
   /* view transitions */
   @keyframes fadeInUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
