@@ -1806,8 +1806,24 @@ function fullnessLevel(pct){
   if(pct >= 35) return 'warm';
   return 'calm';
 }
+// Últimos datos de "en línea" que conocemos, para poder pintar el lobby al
+// instante (sin esperar a Firestore) usando el dato más reciente disponible.
+let lastOnlineSnapshot = {};
+
 async function renderLobby(){
+  // 1) Pintamos YA, con lo último que tengamos en memoria (o vacío la
+  //    primerísima vez). Así las tarjetas -incluida la de Valeria- aparecen
+  //    de inmediato en vez de esperar a que vuelva la lectura de red.
+  paintLobbyGrid(lastOnlineSnapshot);
+
+  // 2) En segundo plano, traemos el estado real y repintamos con los
+  //    contadores correctos (sin repetir la animación de entrada).
   const online = await sGet('farol-online', true) || {};
+  lastOnlineSnapshot = online;
+  paintLobbyGrid(online);
+}
+
+function paintLobbyGrid(online){
   const byRoom = groupOnlineByRoom(online);
   const now = Date.now();
   const totalOnline = Object.values(online).filter(v => now - v.lastSeen <= ONLINE_TTL).length;
