@@ -595,6 +595,14 @@
   .admin-section{margin-bottom:20px;}
   .admin-hint{font-size:12.5px;color:var(--text-muted);line-height:1.5;}
   .admin-users{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;}
+  .dm-list-panel{
+    background:var(--bg-card);border-radius:var(--radius-lg);width:420px;max-width:92vw;max-height:80vh;overflow-y:auto;
+    padding:24px;position:relative;border:1px solid rgba(255,255,255,.08);
+  }
+  .dm-list-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .dm-list-title{font-family:'Fredoka';font-weight:600;font-size:18px;}
+  .dm-list-sub{color:var(--text-muted);font-size:12.5px;margin-top:2px;}
+  .dm-list-items{display:flex;flex-direction:column;gap:6px;}
   .admin-user-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--bg-panel);}
   .admin-user-row .avatar{width:28px;height:28px;font-size:11px;}
   .admin-user-name-row{display:flex;align-items:center;gap:6px;min-width:0;}
@@ -965,6 +973,10 @@
           </div>
         </div>
         <div class="topbar-right">
+          <button class="btn-icon online-toggle" id="lobby-dm-btn" onclick="openPrivateChatsList()" title="Private Chats" aria-label="Private Chats">
+            <i class="fa-solid fa-comment-dots"></i>
+            <span class="online-toggle-badge" id="dm-list-badge-lobby">0</span>
+          </button>
           <button class="btn-icon admin-btn hidden" id="lobby-admin-btn" onclick="openAdminPanel()" title="Admin-Panel" aria-label="Admin-Panel">👑</button>
           <div class="me" onclick="openProfile(currentUser.username)">
             <div class="avatar avatar-sm" id="lobby-me-avatar"></div>
@@ -1007,13 +1019,17 @@
           <div class="brand-mark-sm"><img class="logo-img" alt="Funkeln"></div>
           <div class="brand">Funkeln</div>
         </div>
-        <div class="room-title hidden" id="dm-title" onclick="toggleRoomsSidebar()" style="cursor:pointer;" title="Räume öffnen">
+        <div class="room-title hidden" id="dm-title" onclick="openPrivateChatsList()" style="cursor:pointer;" title="Alle privaten Chats">
           <span id="active-room-name">💬 <span id="dm-partner-name"></span></span>
           <span class="desc">Privater Chat</span>
         </div>
       </div>
       <div class="topbar-right">
         <button class="btn-icon admin-btn hidden" id="chat-admin-btn" onclick="openAdminPanel()" title="Admin-Panel" aria-label="Admin-Panel">👑</button>
+        <button class="btn-icon online-toggle" id="chat-dm-btn" onclick="openPrivateChatsList()" title="Private Chats" aria-label="Private Chats">
+          <i class="fa-solid fa-comment-dots"></i>
+          <span class="online-toggle-badge" id="dm-list-badge-chat">0</span>
+        </button>
         <button class="btn-icon online-toggle" onclick="toggleSidebar()" title="Personen online" aria-label="Personen online">
           <i class="fa-solid fa-users"></i>
           <span class="online-toggle-badge" id="online-toggle-badge">0</span>
@@ -1141,6 +1157,18 @@
         <div class="sidebar-h" style="margin:0 0 10px;">Moderation</div>
         <p class="admin-hint">Wenn du mit dem Cursor über eine Nachricht in einem Raum fährst, siehst du eine 🗑️-Schaltfläche zum Löschen.</p>
       </div>
+    </div>
+  </div>
+
+  <!-- ===================== PRIVATE CHATS LIST ===================== -->
+  <div id="dm-list-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closePrivateChatsList()">
+    <div class="dm-list-panel">
+      <button class="btn-icon profile-close" onclick="closePrivateChatsList()">✕</button>
+      <div class="dm-list-head">
+        <div class="dm-list-title" id="dm-list-title">Private Chats</div>
+      </div>
+      <div class="dm-list-sub" id="dm-list-sub" style="margin-bottom:14px;"></div>
+      <div class="dm-list-items" id="dm-list-items"></div>
     </div>
   </div>
 
@@ -2016,6 +2044,7 @@ async function persistMessage(room, newMsg, attempt){
     const merged = mergeMessages(base, [newMsg]);
     await sSet(msgKey(room), merged, true);
     roomCache[room] = merged;
+    if(room.startsWith('dm__')) updateDmIndexLastMessage(room, newMsg);
   }catch(e){
     if(attempt < 3){ setTimeout(()=>persistMessage(room, newMsg, attempt+1), 900); }
     else{
@@ -2212,6 +2241,7 @@ function startPolling(){
 async function poll(){
   if(!currentUser) return;
   await refreshUsersCache();
+  refreshDmBadge();
   if(currentView === 'lobby'){
     await renderLobby();
     return;
@@ -2289,6 +2319,136 @@ function dmRoomId(a, b){
   return 'dm__' + [a.toLowerCase(), b.toLowerCase()].sort().join('__');
 }
 
+/* ---------------- PRIVATE CHATS INDEX ----------------
+   Firestore has no "list all documents matching a pattern" query available
+   here, so we keep a small shared index doc (id -> {users, lastTs,
+   lastText, lastUser}) that every DM registers itself into. This is what
+   powers the "all private chats" icon for both regular users (their own
+   chats) and the admin (every chat in the system, for oversight). */
+function dmIndexKey(){ return 'farol-dm-index'; }
+
+async function ensureDmIndexEntry(userA, userB){
+  const id = dmRoomId(userA, userB);
+  try{
+    const idx = await sGet(dmIndexKey(), true) || {};
+    if(!idx[id]){
+      idx[id] = {id, users:[userA, userB], lastTs: Date.now(), lastText:'', lastUser:''};
+      await sSet(dmIndexKey(), idx, true);
+    }
+  }catch(e){ console.error('No se pudo registrar el chat privado', e); }
+  return id;
+}
+
+async function updateDmIndexLastMessage(room, newMsg){
+  try{
+    const idx = await sGet(dmIndexKey(), true) || {};
+    const entry = idx[room] || {id: room, users: room.replace(/^dm__/,'').split('__')};
+    entry.lastTs = newMsg.ts;
+    entry.lastText = newMsg.text || (newMsg.media ? '📎 Anhang' : '');
+    entry.lastUser = newMsg.user;
+    idx[room] = entry;
+    await sSet(dmIndexKey(), idx, true);
+  }catch(e){ console.error('No se pudo actualizar el índice de chats privados', e); }
+}
+
+// Regular users only see the chats they're part of; the admin sees all of
+// them, so private conversations can still be moderated.
+async function fetchDmChats(){
+  if(!currentUser) return [];
+  const idx = await sGet(dmIndexKey(), true) || {};
+  const entries = Object.values(idx);
+  if(currentUser.isAdmin) return entries;
+  const meLower = currentUser.username.toLowerCase();
+  return entries.filter(e => (e.users || []).some(u => u.toLowerCase() === meLower));
+}
+
+async function refreshDmBadge(){
+  if(!currentUser) return;
+  try{
+    const chats = await fetchDmChats();
+    const count = chats.length;
+    ['dm-list-badge-lobby','dm-list-badge-chat'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.textContent = count;
+    });
+  }catch(e){ /* badge is a nice-to-have, never block on it */ }
+}
+
+async function openPrivateChatsList(){
+  if(!currentUser) return;
+  document.getElementById('dm-list-sub').textContent = currentUser.isAdmin
+    ? 'Alle privaten Chats der Community (Admin-Ansicht).'
+    : 'Deine privaten Konversationen.';
+  document.getElementById('dm-list-modal').classList.remove('hidden');
+  await renderPrivateChatsList();
+}
+function closePrivateChatsList(){
+  document.getElementById('dm-list-modal').classList.add('hidden');
+}
+
+async function renderPrivateChatsList(){
+  const box = document.getElementById('dm-list-items');
+  box.innerHTML = `<div class="admin-hint">Lädt…</div>`;
+  const chats = await fetchDmChats();
+  chats.sort((a,b)=> (b.lastTs||0) - (a.lastTs||0));
+  box.innerHTML = '';
+  refreshDmBadge();
+
+  if(chats.length === 0){
+    box.innerHTML = `<div class="empty-room" style="padding:20px 6px;">
+      <span class="big">💬</span>${currentUser.isAdmin
+        ? 'Es gibt noch keine privaten Chats in der Community.'
+        : 'Du hast noch keine privaten Chats.<br>Öffne ein Profil und tippe auf „Privater Chat".'}
+    </div>`;
+    return;
+  }
+
+  chats.forEach(chat=>{
+    const users = chat.users || [];
+    const meLower = currentUser.username.toLowerCase();
+    const isMine = users.some(u => u.toLowerCase() === meLower);
+    const otherUser = isMine ? users.find(u => u.toLowerCase() !== meLower) : null;
+    const displayName = isMine ? (otherUser || '???') : users.join(' ↔ ');
+
+    const row = document.createElement('div');
+    row.className = 'online-row';
+    row.style.cursor = 'pointer';
+    row.onclick = () => {
+      closePrivateChatsList();
+      if(isMine && otherUser) openDirectChat(otherUser);
+      else openDirectChatByUsers(users[0], users[1]);
+    };
+
+    let avatarEl;
+    if(otherUser){
+      avatarEl = buildAvatarEl(otherUser, 'avatar-sm');
+    }else{
+      avatarEl = document.createElement('div');
+      avatarEl.className = 'avatar avatar-sm';
+      avatarEl.textContent = '💬';
+    }
+
+    const info = document.createElement('div');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'online-name';
+    nameEl.textContent = displayName;
+    const preview = document.createElement('div');
+    preview.className = 'online-room';
+    let previewText = 'Noch keine Nachrichten';
+    if(chat.lastText){
+      const who = chat.lastUser === currentUser.username ? 'Du' : (chat.lastUser || '');
+      previewText = who ? `${who}: ${chat.lastText}` : chat.lastText;
+    }
+    preview.textContent = previewText.length > 46 ? previewText.slice(0,46) + '…' : previewText;
+    info.appendChild(nameEl);
+    info.appendChild(preview);
+
+    row.appendChild(avatarEl);
+    row.appendChild(info);
+    box.appendChild(row);
+  });
+}
+
 async function startPrivateChat(){
   if(!viewingProfile || !currentUser) return;
   if(viewingProfile === currentUser.username){
@@ -2303,6 +2463,7 @@ async function startPrivateChat(){
 async function openDirectChat(otherUsername){
   dmPartner = otherUsername;
   currentRoom = dmRoomId(currentUser.username, otherUsername);
+  ensureDmIndexEntry(currentUser.username, otherUsername); // fire-and-forget: don't block opening the chat
   closeProfile();
   closeSidebars();
 
@@ -2314,6 +2475,34 @@ async function openDirectChat(otherUsername){
   document.getElementById('dm-partner-name').textContent = otherUsername;
   document.getElementById('dm-title').classList.remove('hidden');
   renderRoomList(); // no ROOMS entry matches a dm__ id, so nothing shows as "active" — correct
+
+  await loadMessages();
+  document.getElementById('msg-input').focus();
+}
+
+// Lets the admin open any DM from the private-chats list, even a
+// conversation between two other people, for moderation purposes.
+async function openDirectChatByUsers(userA, userB){
+  if(!currentUser) return;
+  const meLower = currentUser.username.toLowerCase();
+  if(userA.toLowerCase() === meLower || userB.toLowerCase() === meLower){
+    return openDirectChat(userA.toLowerCase() === meLower ? userB : userA);
+  }
+  if(!currentUser.isAdmin) return; // non-admins can only open their own chats
+
+  dmPartner = null;
+  currentRoom = dmRoomId(userA, userB);
+  closeProfile();
+  closeSidebars();
+
+  document.getElementById('view-lobby').classList.add('hidden');
+  document.getElementById('view-chat').classList.remove('hidden');
+  document.getElementById('view-chat').classList.add('view-fade');
+  currentView = 'chat';
+
+  document.getElementById('dm-partner-name').textContent = `${userA} ↔ ${userB} · Admin-Ansicht`;
+  document.getElementById('dm-title').classList.remove('hidden');
+  renderRoomList();
 
   await loadMessages();
   document.getElementById('msg-input').focus();
