@@ -482,13 +482,10 @@
   }
   .banner-edit-btn:hover{background:rgba(10,10,20,.75);}
   .banner-pos-btn{right:auto;left:14px;}
-  .banner-delete-btn{top:14px;bottom:auto;right:14px;background:rgba(220,53,69,.75);}
-  .banner-delete-btn:hover{background:rgba(220,53,69,.92);}
   @media (max-width:480px){
     .banner-edit-btn{font-size:11px;padding:5px 9px;}
     .banner-pos-btn{left:10px;}
     #banner-edit-btn{right:10px;}
-    .banner-delete-btn{top:10px;right:10px;}
   }
   .banner-position-frame{
     position:relative;width:100%;height:150px;overflow:hidden;border-radius:var(--radius-md);
@@ -498,6 +495,18 @@
   .banner-position-frame.dragging{cursor:grabbing;}
   .banner-position-frame img{position:absolute;top:0;left:0;max-width:none;user-select:none;pointer-events:none;}
   .banner-position-hint{font-size:11.5px;color:var(--text-muted);text-align:center;margin-bottom:4px;}
+  .banner-zoom-row{display:flex;align-items:center;gap:10px;margin:4px 0 14px;}
+  .banner-zoom-row input[type="range"]{
+    flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;
+    background:var(--bg-card-2);outline:none;
+  }
+  .banner-zoom-row input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;
+    background:var(--accent-amber);cursor:pointer;border:2px solid var(--bg-card);
+  }
+  .banner-zoom-row input[type="range"]::-moz-range-thumb{
+    width:16px;height:16px;border-radius:50%;background:var(--accent-amber);cursor:pointer;border:2px solid var(--bg-card);
+  }
   .profile-head{display:flex;flex-direction:column;gap:12px;padding:0 24px 2px;margin-top:-40px;position:relative;}
   .profile-head-top{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;}
   .profile-avatar-wrap{position:relative;flex:0 0 auto;}
@@ -507,12 +516,6 @@
     border-radius:50%;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
     user-select:none;z-index:3;
   }
-  .avatar-delete-btn{
-    position:absolute;bottom:0;left:0;background:var(--accent-coral);color:#fff;border:2px solid var(--bg-card);
-    border-radius:50%;width:28px;height:28px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-    user-select:none;z-index:3;
-  }
-  .avatar-delete-btn:hover{filter:brightness(1.12);}
   .profile-head-info{flex:1 1 140px;padding-bottom:8px;min-width:140px;}
   .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .profile-handle{font-size:12.5px;color:var(--text-muted);}
@@ -1227,8 +1230,7 @@
 
       <div class="profile-banner" id="profile-banner">
         <input type="file" id="banner-file" accept="image/*" class="hidden-file" onchange="handleBannerFile(event)">
-        <button type="button" class="banner-edit-btn banner-pos-btn hidden" id="banner-pos-btn" onclick="openBannerPositionModal()">🎯 Position anpassen</button>
-        <button type="button" class="banner-edit-btn banner-delete-btn hidden" id="banner-delete-btn" onclick="confirmDeleteBanner()">🗑️ Entfernen</button>
+        <button type="button" class="banner-edit-btn banner-pos-btn hidden" id="banner-pos-btn" onclick="openBannerPositionModal()">🖼️ Bild anpassen</button>
         <label class="banner-edit-btn hidden" id="banner-edit-btn" for="banner-file">📷 Banner ändern</label>
       </div>
 
@@ -1238,7 +1240,6 @@
             <div class="avatar profile-avatar" id="profile-avatar"></div>
             <input type="file" id="avatar-file" accept="image/*" class="hidden-file" onchange="handleAvatarFile(event)">
             <label class="avatar-edit-btn hidden" id="avatar-edit-btn" for="avatar-file" title="Profilbild ändern">📷</label>
-            <button type="button" class="avatar-delete-btn hidden" id="avatar-delete-btn" onclick="confirmDeleteAvatar()" title="Profilbild entfernen" aria-label="Profilbild entfernen">🗑️</button>
           </div>
           <div class="profile-head-info">
             <div class="profile-name" id="profile-name"></div>
@@ -1332,10 +1333,15 @@
 
   <div id="banner-position-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeBannerPositionModal()">
     <div class="modal">
-      <h3>Bannerposition anpassen</h3>
-      <div class="banner-position-hint">Zieh das Bild, um den sichtbaren Ausschnitt festzulegen.</div>
+      <h3>Bild anpassen</h3>
+      <div class="banner-position-hint">Zieh das Bild, um den sichtbaren Ausschnitt festzulegen, und nutze den Regler, um die Bildgröße/Schärfe anzupassen.</div>
       <div class="banner-position-frame" id="banner-position-frame">
         <img id="banner-position-img" alt="Banner" draggable="false">
+      </div>
+      <div class="banner-zoom-row">
+        <i class="fa-solid fa-image" style="color:var(--text-muted);font-size:12px;"></i>
+        <input type="range" id="banner-zoom-slider" min="100" max="250" value="100" step="1">
+        <i class="fa-solid fa-image" style="color:var(--text-muted);font-size:18px;"></i>
       </div>
       <div class="modal-actions">
         <button class="btn-ghost" onclick="closeBannerPositionModal()">Abbrechen</button>
@@ -3124,26 +3130,21 @@ function renderProfileView(u){
         document.getElementById('profile-banner').style.backgroundImage = `url(${val})`;
         if(currentUser && currentUser.username === u.username){
           document.getElementById('banner-pos-btn').classList.remove('hidden');
-          document.getElementById('banner-delete-btn').classList.remove('hidden');
         }
       }
     }).catch(()=>{ bannerCache[bKey] = null; });
   }
 
   const knownPos = u.bannerPos;
-  applyBannerPosition(banner, knownPos);
+  const knownZoom = u.bannerZoom || 1;
+  applyBannerPosition(banner, knownPos, knownZoom);
 
   const avEl = document.getElementById('profile-avatar');
   avEl.className = 'avatar profile-avatar';
   applyAvatarStyle(avEl, u.username);
   const aKey = u.username.toLowerCase();
-  let knownAvatar = (avatarCache[aKey] !== undefined) ? avatarCache[aKey] : (u.avatar || getLocalAvatarCache(aKey));
   if(avatarCache[aKey] === undefined){
-    sGet(avatarKey(u.username), true).then(val => {
-      if(viewingProfile === u.username){
-        document.getElementById('avatar-delete-btn').classList.toggle('hidden', !(currentUser && currentUser.username === u.username && val));
-      }
-    }).catch(()=>{});
+    sGet(avatarKey(u.username), true).catch(()=>{});
   }
 
   const isOwn = currentUser && currentUser.username === u.username;
@@ -3152,9 +3153,7 @@ function renderProfileView(u){
   document.getElementById('profile-dm-btn').classList.toggle('hidden', isOwn);
   document.getElementById('banner-edit-btn').classList.toggle('hidden', !isOwn);
   document.getElementById('banner-pos-btn').classList.toggle('hidden', !(isOwn && knownBanner));
-  document.getElementById('banner-delete-btn').classList.toggle('hidden', !(isOwn && knownBanner));
   document.getElementById('avatar-edit-btn').classList.toggle('hidden', !isOwn);
-  document.getElementById('avatar-delete-btn').classList.toggle('hidden', !(isOwn && knownAvatar));
   document.getElementById('gallery-add-btn').classList.toggle('hidden', !isOwn);
 
   document.getElementById('profile-view-mode').classList.remove('hidden');
@@ -3242,54 +3241,13 @@ async function handleAvatarFile(e){
   e.target.value = '';
 }
 
-async function confirmDeleteAvatar(){
-  if(!currentUser) return;
-  if(!confirm('Möchtest du dein Profilbild wirklich entfernen?')) return;
-  const key = currentUser.username.toLowerCase();
-  try{
-    await sDelete(avatarKey(currentUser.username), true);
-    avatarCache[key] = null;
-    setLocalAvatarCache(key, null);
-    currentUser.avatar = null;
-    if(usersCache[key]) usersCache[key].avatar = null;
-    renderProfileView(currentUser);
-    refreshMyAvatarUI();
-    showToast('Profilbild entfernt.', 'success');
-  }catch(err){
-    console.error(err);
-    showToast('Das Profilbild konnte nicht entfernt werden. Versuche es erneut.', 'error');
-  }
-}
-
-async function confirmDeleteBanner(){
-  if(!currentUser) return;
-  if(!confirm('Möchtest du deinen Banner wirklich entfernen?')) return;
-  const key = currentUser.username.toLowerCase();
-  try{
-    await sDelete(bannerKey(currentUser.username), true);
-    bannerCache[key] = null;
-    currentUser.banner = null;
-    currentUser.bannerPos = null;
-    // bannerPos vive dentro del documento compartido "farol-users", así
-    // que hay que limpiarlo ahí también para que un futuro banner no
-    // arranque con una posición vieja aplicada.
-    const users = await sGet('farol-users', true) || usersCache;
-    if(users[key]){
-      users[key].banner = null;
-      delete users[key].bannerPos;
-      await sSet('farol-users', users, true);
-      usersCache = users;
-    }
-    renderProfileView(currentUser);
-    showToast('Banner entfernt.', 'success');
-  }catch(err){
-    console.error(err);
-    showToast('Der Banner konnte nicht entfernt werden. Versuche es erneut.', 'error');
-  }
-}
-
-function applyBannerPosition(el, posStr){
+function applyBannerPosition(el, posStr, zoom){
   el.style.backgroundPosition = posStr || '50% 50%';
+  // El zoom guardado (>1) se traduce a un background-size mayor a 'cover',
+  // así el ajuste hecho en el modal de posición también se ve en el banner
+  // real, no solo en la vista previa.
+  const z = zoom || 1;
+  el.style.backgroundSize = z > 1 ? (Math.round(z * 100) + '% auto') : 'cover';
 }
 
 async function handleBannerFile(e){
@@ -3298,19 +3256,22 @@ async function handleBannerFile(e){
   try{
     // El banner se ve grande en pantalla (hasta 520px de ancho, y más
     // todavía en pantallas retina/HiDPI, que piden 2x o 3x esos píxeles
-    // para verse nítidas). 760x260 al 62% de calidad se quedaba corto para
-    // eso y se notaba pixelado/borroso. Subimos resolución y calidad —
-    // banner.jpg sigue siendo liviano (tiene su propio documento en
-    // Firestore, con hasta 1 MB de margen) pero ahora se ve nítido.
-    const dataUrl = await resizeImageFile(file, 1200, 420, 0.85);
+    // para verse nítidas). Usamos una resolución y calidad generosas para
+    // que no se note pixelado/borroso — banner.jpg sigue siendo liviano
+    // (tiene su propio documento en Firestore, con hasta 1 MB de margen).
+    const dataUrl = await resizeImageFile(file, 1600, 560, 0.9);
     const key = currentUser.username.toLowerCase();
     const ok = await sSetCritical(bannerKey(currentUser.username), dataUrl, true);
     bannerCache[key] = dataUrl;
     currentUser.banner = dataUrl; // solo en memoria, para esta sesión
     if(usersCache[key]) usersCache[key].banner = dataUrl;
-    // Un banner nuevo arranca centrado; el usuario puede reajustar enseguida.
+    // Un banner nuevo arranca centrado y sin zoom; el usuario puede reajustar enseguida.
     currentUser.bannerPos = '50% 50%';
-    if(usersCache[key]) usersCache[key].bannerPos = '50% 50%';
+    currentUser.bannerZoom = 1;
+    if(usersCache[key]){
+      usersCache[key].bannerPos = '50% 50%';
+      usersCache[key].bannerZoom = 1;
+    }
     renderProfileView(currentUser);
     showToast(ok ? 'Banner aktualisiert.' : 'Lokal aktualisiert, konnte aber nicht auf dem Server gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
     if(ok) openBannerPositionModal();
@@ -3321,7 +3282,34 @@ async function handleBannerFile(e){
   e.target.value = '';
 }
 
-/* ---------------- BANNER POSITION ADJUSTER ---------------- */
+/* ---------------- BANNER POSITION + ZOOM ADJUSTER ---------------- */
+// El zoom es relativo a la escala mínima "cover" (la que ya llena el marco
+// sin dejar huecos): zoom=1 es esa escala base, zoom=2.5 amplía la imagen
+// 2.5x sobre esa base. Guardarlo así (en vez de un tamaño fijo en px) hace
+// que se vea igual sin importar el ancho de pantalla en el que se guardó.
+function applyBannerZoom(zoom){
+  const img = document.getElementById('banner-position-img');
+  const frame = document.getElementById('banner-position-frame');
+  const naturalW = parseFloat(frame.dataset.naturalW);
+  const naturalH = parseFloat(frame.dataset.naturalH);
+  const baseScale = parseFloat(frame.dataset.baseScale);
+  if(!naturalW || !naturalH || !baseScale) return;
+  const frameW = frame.clientWidth, frameH = frame.clientHeight;
+  const scale = baseScale * zoom;
+  const dispW = naturalW * scale, dispH = naturalH * scale;
+  img.style.width = dispW + 'px';
+  img.style.height = dispH + 'px';
+  const px = parseFloat(frame.dataset.px);
+  const py = parseFloat(frame.dataset.py);
+  let left = -(((isNaN(px) ? 50 : px) / 100) * (dispW - frameW));
+  let top = -(((isNaN(py) ? 50 : py) / 100) * (dispH - frameH));
+  left = Math.min(0, Math.max(frameW - dispW, left));
+  top = Math.min(0, Math.max(frameH - dispH, top));
+  img.style.left = left + 'px';
+  img.style.top = top + 'px';
+  frame.dataset.zoom = zoom;
+}
+
 function openBannerPositionModal(){
   if(!currentUser) return;
   const key = currentUser.username.toLowerCase();
@@ -3329,19 +3317,19 @@ function openBannerPositionModal(){
   if(!dataUrl){ showToast('Lade zuerst ein Bannerbild hoch.'); return; }
   const img = document.getElementById('banner-position-img');
   const frame = document.getElementById('banner-position-frame');
+  const zoomSlider = document.getElementById('banner-zoom-slider');
   img.onload = () => {
-    const naturalW = img.naturalWidth, naturalH = img.naturalHeight;
     const frameW = frame.clientWidth, frameH = frame.clientHeight;
-    const scale = Math.max(frameW / naturalW, frameH / naturalH);
-    const dispW = naturalW * scale, dispH = naturalH * scale;
-    img.style.width = dispW + 'px';
-    img.style.height = dispH + 'px';
+    frame.dataset.naturalW = img.naturalWidth;
+    frame.dataset.naturalH = img.naturalHeight;
+    frame.dataset.baseScale = Math.max(frameW / img.naturalWidth, frameH / img.naturalHeight);
     const posStr = currentUser.bannerPos || '50% 50%';
     const parts = posStr.split(' ').map(s => parseFloat(s));
-    const px = isNaN(parts[0]) ? 50 : parts[0];
-    const py = isNaN(parts[1]) ? 50 : parts[1];
-    img.style.left = (-((px / 100) * (dispW - frameW))) + 'px';
-    img.style.top = (-((py / 100) * (dispH - frameH))) + 'px';
+    frame.dataset.px = isNaN(parts[0]) ? 50 : parts[0];
+    frame.dataset.py = isNaN(parts[1]) ? 50 : parts[1];
+    const zoom = currentUser.bannerZoom || 1;
+    if(zoomSlider) zoomSlider.value = Math.round(zoom * 100);
+    applyBannerZoom(zoom);
   };
   img.src = dataUrl;
   document.getElementById('banner-position-modal').classList.remove('hidden');
@@ -3349,6 +3337,10 @@ function openBannerPositionModal(){
 function closeBannerPositionModal(){
   document.getElementById('banner-position-modal').classList.add('hidden');
 }
+
+document.getElementById('banner-zoom-slider') && document.getElementById('banner-zoom-slider').addEventListener('input', (e)=>{
+  applyBannerZoom(parseInt(e.target.value, 10) / 100);
+});
 
 (function setupBannerPositionDrag(){
   const frame = document.getElementById('banner-position-frame');
@@ -3383,8 +3375,19 @@ function closeBannerPositionModal(){
     e.preventDefault();
   }
   function pointerUp(){
+    if(!dragging) return;
     dragging = false;
     frame.classList.remove('dragging');
+    // Guardamos la posición relativa alcanzada para que un cambio de zoom
+    // posterior siga centrado en el mismo punto de la imagen.
+    const img = document.getElementById('banner-position-img');
+    const frameW = frame.clientWidth, frameH = frame.clientHeight;
+    const dispW = parseFloat(img.style.width), dispH = parseFloat(img.style.height);
+    const left = parseFloat(img.style.left) || 0;
+    const top = parseFloat(img.style.top) || 0;
+    const rangeX = dispW - frameW, rangeY = dispH - frameH;
+    frame.dataset.px = rangeX > 0 ? Math.round((-left / rangeX) * 100) : 50;
+    frame.dataset.py = rangeY > 0 ? Math.round((-top / rangeY) * 100) : 50;
   }
   frame.addEventListener('mousedown', pointerDown);
   window.addEventListener('mousemove', pointerMove);
@@ -3407,6 +3410,7 @@ async function saveBannerPosition(){
   const px = rangeX > 0 ? Math.round((-left / rangeX) * 100) : 50;
   const py = rangeY > 0 ? Math.round((-top / rangeY) * 100) : 50;
   const posStr = `${px}% ${py}%`;
+  const zoom = parseFloat(frame.dataset.zoom) || 1;
 
   // Se guarda dentro del mismo documento "farol-users" (junto a bio/socials)
   // en vez de un documento propio, para no depender de un permiso de
@@ -3415,12 +3419,14 @@ async function saveBannerPosition(){
   const users = await sGet('farol-users', true) || usersCache;
   const u = users[key] || currentUser;
   u.bannerPos = posStr;
+  u.bannerZoom = zoom;
   users[key] = u;
   let ok = true;
   try{ await sSet('farol-users', users, true); }catch(e){ ok = false; }
   usersCache = users;
   currentUser.bannerPos = posStr;
-  applyBannerPosition(document.getElementById('profile-banner'), posStr);
+  currentUser.bannerZoom = zoom;
+  applyBannerPosition(document.getElementById('profile-banner'), posStr, zoom);
   closeBannerPositionModal();
   showToast(ok ? 'Bannerposition gespeichert.' : 'Konnte nicht gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
 }
