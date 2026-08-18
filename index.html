@@ -3925,14 +3925,14 @@ let discoverIndex = 0;
 
 // Si el usuario actual indicó su género (hombre/mujer), en "Descubrir" solo
 // le mostramos perfiles del género opuesto — igual que pidió: alguien
-// registrado como "hombre" ve perfiles de "mujeres", y viceversa. Los
-// perfiles sin género definido (cuentas antiguas, el admin antes de
-// completar el modal, o quien eligió "Divers") no se excluyen, para no
-// hacer desaparecer cuentas existentes de la lista.
+// registrado como "hombre" ve SOLO perfiles de "mujeres", y viceversa. Los
+// perfiles sin género definido (cuentas viejas que aún no pasaron por el
+// modal de "Ich bin", o quien eligió "Divers") también quedan afuera: el
+// filtro es estricto, no una excepción para cuentas antiguas.
 function oppositeGender(g){
   if(g === 'male') return 'female';
   if(g === 'female') return 'male';
-  return null; // "other"/sin definir: sin filtro de género
+  return null; // el propio usuario no definió género (o eligió "Divers"): sin filtro de género
 }
 async function loadDiscoverList(){
   const users = await sGet('farol-users', true) || usersCache;
@@ -3940,7 +3940,7 @@ async function loadDiscoverList(){
   const wanted = currentUser ? oppositeGender(currentUser.gender) : null;
   discoverList = Object.values(users)
     .filter(u => u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase()))
-    .filter(u => !wanted || !u.gender || u.gender === wanted)
+    .filter(u => !wanted || u.gender === wanted)
     // Los perfiles con más likes aparecen primero, para que descubrir se
     // sienta vivo; en empate, orden alfabético estable.
     .sort((a, b) => {
