@@ -332,6 +332,14 @@
     font-size:10px;font-weight:700;line-height:17px;text-align:center;
     box-shadow:0 0 0 2px var(--bg-panel);
   }
+  .whatsapp-link{
+    display:flex;align-items:center;justify-content:center;
+    width:38px;height:38px;border-radius:11px;
+    background:var(--bg-card);border:1px solid rgba(255,255,255,.08);
+    transition:background .15s ease,border-color .15s ease,transform .15s ease;
+  }
+  .whatsapp-link:hover{background:#1f2a1f;border-color:#25D366;transform:translateY(-1px);}
+  .whatsapp-link svg{width:20px;height:20px;display:block;}
 
   .chat-body{flex:1;display:flex;min-height:0;position:relative;}
 
@@ -1141,6 +1149,12 @@
             <i class="fa-solid fa-comment-dots"></i>
             <span class="online-toggle-badge" id="dm-list-badge-lobby">0</span>
           </button>
+          <a class="whatsapp-link" href="https://gruppende.de" target="_blank" rel="noopener noreferrer" title="gruppende.de" aria-label="gruppende.de">
+            <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="16" cy="16" r="16" fill="#25D366"/>
+              <path fill="#fff" d="M23.47 8.52A9.86 9.86 0 0 0 16.06 5.5c-5.47 0-9.92 4.45-9.92 9.92 0 1.75.46 3.45 1.33 4.95L6 26.5l6.27-1.64a9.9 9.9 0 0 0 4.74 1.2h.01c5.47 0 9.92-4.45 9.92-9.92a9.86 9.86 0 0 0-2.97-7.02Zm-7.4 15.26h-.01a8.24 8.24 0 0 1-4.2-1.15l-.3-.18-3.72.97 1-3.63-.2-.31a8.2 8.2 0 0 1-1.26-4.4c0-4.55 3.7-8.25 8.25-8.25a8.2 8.2 0 0 1 5.83 2.42 8.2 8.2 0 0 1 2.42 5.83c0 4.55-3.7 8.25-8.25 8.25Zm4.53-6.17c-.25-.12-1.46-.72-1.69-.8-.23-.08-.39-.12-.56.13-.16.25-.64.8-.78.96-.14.16-.29.18-.54.06-.25-.12-1.04-.38-1.98-1.22a7.42 7.42 0 0 1-1.37-1.7c-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.42h-.48c-.16 0-.43.06-.65.31-.23.25-.86.84-.86 2.04 0 1.2.88 2.36 1 2.53.12.16 1.73 2.64 4.2 3.7.59.25 1.05.4 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.46-.6 1.66-1.17.21-.58.21-1.08.14-1.18-.06-.11-.22-.17-.47-.29Z"/>
+            </svg>
+          </a>
           <button class="btn-icon admin-btn hidden" id="lobby-admin-btn" onclick="openAdminPanel()" title="Admin-Panel" aria-label="Admin-Panel">👑</button>
           <div class="me" onclick="openProfile(currentUser.username)">
             <div class="avatar avatar-sm" id="lobby-me-avatar"></div>
@@ -1194,6 +1208,12 @@
           <i class="fa-solid fa-comment-dots"></i>
           <span class="online-toggle-badge" id="dm-list-badge-chat">0</span>
         </button>
+        <a class="whatsapp-link" href="https://gruppende.de" target="_blank" rel="noopener noreferrer" title="gruppende.de" aria-label="gruppende.de">
+          <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="16" fill="#25D366"/>
+            <path fill="#fff" d="M23.47 8.52A9.86 9.86 0 0 0 16.06 5.5c-5.47 0-9.92 4.45-9.92 9.92 0 1.75.46 3.45 1.33 4.95L6 26.5l6.27-1.64a9.9 9.9 0 0 0 4.74 1.2h.01c5.47 0 9.92-4.45 9.92-9.92a9.86 9.86 0 0 0-2.97-7.02Zm-7.4 15.26h-.01a8.24 8.24 0 0 1-4.2-1.15l-.3-.18-3.72.97 1-3.63-.2-.31a8.2 8.2 0 0 1-1.26-4.4c0-4.55 3.7-8.25 8.25-8.25a8.2 8.2 0 0 1 5.83 2.42 8.2 8.2 0 0 1 2.42 5.83c0 4.55-3.7 8.25-8.25 8.25Zm4.53-6.17c-.25-.12-1.46-.72-1.69-.8-.23-.08-.39-.12-.56.13-.16.25-.64.8-.78.96-.14.16-.29.18-.54.06-.25-.12-1.04-.38-1.98-1.22a7.42 7.42 0 0 1-1.37-1.7c-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.42h-.48c-.16 0-.43.06-.65.31-.23.25-.86.84-.86 2.04 0 1.2.88 2.36 1 2.53.12.16 1.73 2.64 4.2 3.7.59.25 1.05.4 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.46-.6 1.66-1.17.21-.58.21-1.08.14-1.18-.06-.11-.22-.17-.47-.29Z"/>
+          </svg>
+        </a>
         <button class="btn-icon online-toggle" onclick="toggleSidebar()" title="Personen online" aria-label="Personen online">
           <i class="fa-solid fa-users"></i>
           <span class="online-toggle-badge" id="online-toggle-badge">0</span>
