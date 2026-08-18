@@ -571,6 +571,15 @@
     user-select:none;z-index:3;
   }
   .profile-head-info{flex:1 1 140px;padding-bottom:8px;min-width:140px;}
+  .profile-likes-chip{
+    margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:var(--bg-void);
+    border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:5px 12px;font-size:12.5px;
+    color:var(--text-cream);cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .profile-likes-chip i{color:var(--text-muted);font-size:12px;}
+  .profile-likes-chip.liked{border-color:rgba(255,61,107,.5);background:rgba(255,61,107,.1);}
+  .profile-likes-chip.liked i{color:var(--accent-coral);}
+  .profile-likes-chip.is-own{cursor:default;}
   .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .profile-handle{font-size:12.5px;color:var(--text-muted);}
   .profile-head-actions{display:flex;flex-wrap:wrap;gap:8px;}
@@ -793,6 +802,48 @@
   .lobby-hero h1 span{color:var(--accent-amber);}
   .lobby-hero p{color:var(--text-muted);font-size:14.5px;margin:0;}
   .lobby-hero p span{color:var(--accent-mint);font-weight:700;}
+
+  /* ===== Discover members (avatars, likes, chat gratis) ===== */
+  .discover-section{max-width:1160px;width:100%;margin:0 auto 30px;animation:fadeInUp .5s ease both;}
+  .discover-header{padding:0 2px;margin-bottom:12px;}
+  .discover-header h2{
+    font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px;font-weight:600;
+  }
+  .discover-header h2 i{color:var(--accent-coral);font-size:15px;}
+  .discover-header p{margin:0;color:var(--text-muted);font-size:13px;}
+  .discover-scroll{
+    display:flex;gap:12px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity;
+  }
+  .discover-card{
+    flex:0 0 auto;width:128px;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);
+    border-radius:var(--radius-md);padding:14px 10px 12px;text-align:center;scroll-snap-align:start;
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+  }
+  .discover-avatar{width:70px;height:70px;font-size:22px;border:3px solid var(--bg-card-2);}
+  .discover-name{
+    font-size:12.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .discover-actions{display:flex;gap:6px;width:100%;}
+  .discover-like-btn{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg-void);
+    border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:7px 4px;font-size:11.5px;
+    color:var(--text-cream);cursor:pointer;font-family:'Inter',sans-serif;min-width:0;
+  }
+  .discover-like-btn i{font-size:12px;color:var(--text-muted);}
+  .discover-like-btn.liked{border-color:rgba(255,61,107,.5);background:rgba(255,61,107,.1);}
+  .discover-like-btn.liked i{color:var(--accent-coral);}
+  .discover-chat-btn{
+    flex:0 0 auto;width:32px;height:32px;border-radius:10px;background:var(--accent-amber);
+    color:#2b0618;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;font-size:12.5px;
+  }
+  .discover-chat-btn:hover{filter:brightness(1.08);}
+  .discover-empty{color:var(--text-muted);font-size:13px;padding:10px 4px;}
+  @media (max-width:480px){
+    .discover-card{width:112px;padding:12px 8px 10px;}
+    .discover-avatar{width:60px;height:60px;font-size:19px;}
+  }
+
   .lobby-grid{
     max-width:1160px;width:100%;margin:0 auto;
     display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px;justify-content:center;
@@ -1201,6 +1252,18 @@
         <h1>Wähle deinen <span>Raum</span></h1>
         <p>Das sind die aktiven Plätze gerade jetzt. <span id="lobby-total-online">0</span> Personen sind bei Funkeln verbunden.</p>
       </div>
+
+      <!-- ===================== DISCOVER MEMBERS (Likes + Free DM) ===================== -->
+      <div class="discover-section" id="discover-section">
+        <div class="discover-header">
+          <h2><i class="fa-solid fa-heart"></i> Entdecke Mitglieder</h2>
+          <p>Gib ein Like, wenn dir jemand gefällt, oder schreib direkt einen kostenlosen privaten Chat.</p>
+        </div>
+        <div class="discover-scroll" id="discover-scroll">
+          <div class="discover-empty">Lade Mitglieder…</div>
+        </div>
+      </div>
+
       <div class="lobby-grid" id="lobby-grid" data-painted="0"></div>
 
       <!-- ===================== APP FOOTER (simple) ===================== -->
@@ -1316,6 +1379,9 @@
           <div class="profile-head-info">
             <div class="profile-name" id="profile-name"></div>
             <div class="profile-handle" id="profile-handle"></div>
+            <button type="button" class="profile-likes-chip" id="profile-likes-chip" onclick="toggleProfileLike(viewingProfile)" title="Like geben/entfernen">
+              <i class="fa-solid fa-heart"></i> <span id="profile-likes-count">0</span>
+            </button>
           </div>
         </div>
         <div class="profile-head-actions">
@@ -2180,6 +2246,7 @@ async function showChat(){
   startHeartbeat();
   startDmRealtime();
   await renderLobby();
+  renderDiscover();
   startPolling();
 }
 
@@ -2332,6 +2399,7 @@ async function backToLobby(){
   closeSidebars();
   document.getElementById('lobby-grid').dataset.painted = '0';
   await renderLobby();
+  renderDiscover();
 }
 function refreshMyAvatarUI(){
   const el = document.getElementById('me-avatar');
@@ -3006,6 +3074,7 @@ async function poll(){
   refreshDmBadge();
   if(currentView === 'lobby'){
     await renderLobby();
+    renderDiscover();
     return;
   }
   await loadMessages();
@@ -3552,6 +3621,17 @@ function renderProfileView(u){
   }
 
   const isOwn = currentUser && currentUser.username === u.username;
+
+  // ---- Likes chip: cuántos likes tiene este perfil, y si currentUser ya
+  // le dio like (para pintar el corazón activo). ----
+  const likes = Array.isArray(u.likes) ? u.likes : [];
+  const iLikedThis = !!(currentUser && likes.some(l => l.toLowerCase() === currentUser.username.toLowerCase()));
+  document.getElementById('profile-likes-count').textContent = likes.length;
+  const likesChip = document.getElementById('profile-likes-chip');
+  likesChip.classList.toggle('liked', iLikedThis);
+  likesChip.classList.toggle('is-own', isOwn);
+  likesChip.title = isOwn ? 'Likes, die dein Profil erhalten hat' : (iLikedThis ? 'Like entfernen' : 'Like geben');
+
   document.getElementById('profile-edit-toggle').classList.toggle('hidden', !isOwn);
   document.getElementById('profile-logout-btn').classList.toggle('hidden', !isOwn);
   document.getElementById('profile-dm-btn').classList.toggle('hidden', isOwn);
@@ -3564,6 +3644,109 @@ function renderProfileView(u){
   document.getElementById('profile-edit-mode').classList.add('hidden');
 
   renderSocials(u.socials || {});
+}
+
+/* ================= LIKES + DISCOVER MEMBERS ================= */
+// Da o quita un like al perfil de "username". Los likes se guardan como un
+// array de nombres de usuario dentro del propio registro en el documento
+// compartido "farol-users" (u.likes), usando una transacción atómica para
+// que dos personas dando like casi al mismo tiempo no se pisen entre sí.
+async function toggleProfileLike(username){
+  if(!currentUser){ showToast('Melde dich an, um Likes zu vergeben.'); return; }
+  if(!username) return;
+  if(username.toLowerCase() === currentUser.username.toLowerCase()){
+    showToast('Du kannst dir selbst kein Like geben.');
+    return;
+  }
+  const liker = currentUser.username;
+  let likedNow = false;
+  let newUsers;
+  try{
+    newUsers = await sTransact('farol-users', (users) => {
+      users = users || {};
+      const key = username.toLowerCase();
+      const u = users[key] || (username === ADMIN_NAME ? buildAdminUser() : {username, color: colorFor(username), createdAt: Date.now()});
+      u.likes = Array.isArray(u.likes) ? u.likes.slice() : [];
+      const idx = u.likes.findIndex(l => l.toLowerCase() === liker.toLowerCase());
+      if(idx >= 0){ u.likes.splice(idx, 1); likedNow = false; }
+      else{ u.likes.push(liker); likedNow = true; }
+      users[key] = u;
+      return users;
+    });
+  }catch(err){
+    console.error(err);
+    showToast('Like konnte nicht gespeichert werden. Versuche es erneut.', 'error');
+    return;
+  }
+  usersCache = newUsers || usersCache;
+  renderDiscover();
+  if(viewingProfile && viewingProfile.toLowerCase() === username.toLowerCase()){
+    renderProfileView(usersCache[username.toLowerCase()] || userLookup(username));
+  }
+  showToast(likedNow ? 'Like gesendet! ❤️' : 'Like zurückgenommen.', 'success');
+}
+
+// Tira horizontal de miembros registrados que se ve apenas se entra a la
+// app (dentro del lobby): foto de perfil, botón de Like con contador, y un
+// botón de chat privado gratuito directo (sin pasar por el perfil).
+async function renderDiscover(){
+  const scroll = document.getElementById('discover-scroll');
+  if(!scroll) return;
+  const users = await sGet('farol-users', true) || usersCache;
+  usersCache = users;
+
+  let list = Object.values(users).filter(u =>
+    u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase())
+  );
+  // Más likeados primero, para que el descubrimiento se sienta vivo; empate
+  // se resuelve alfabéticamente para que el orden no salte en cada poll.
+  list.sort((a, b) => {
+    const diff = (b.likes || []).length - (a.likes || []).length;
+    return diff !== 0 ? diff : a.username.localeCompare(b.username);
+  });
+
+  scroll.innerHTML = '';
+  if(!list.length){
+    scroll.innerHTML = '<div class="discover-empty">Noch keine anderen Mitglieder registriert.</div>';
+    return;
+  }
+  list.forEach(u => {
+    const card = document.createElement('div');
+    card.className = 'discover-card';
+
+    card.appendChild(buildAvatarEl(u.username, 'discover-avatar'));
+
+    const name = document.createElement('div');
+    name.className = 'discover-name';
+    name.textContent = u.username;
+    name.title = u.username;
+    card.appendChild(name);
+
+    const actions = document.createElement('div');
+    actions.className = 'discover-actions';
+
+    const likes = Array.isArray(u.likes) ? u.likes : [];
+    const iLiked = currentUser && likes.some(l => l.toLowerCase() === currentUser.username.toLowerCase());
+    const likeBtn = document.createElement('button');
+    likeBtn.type = 'button';
+    likeBtn.className = 'discover-like-btn' + (iLiked ? ' liked' : '');
+    likeBtn.title = iLiked ? 'Like entfernen' : 'Like geben';
+    likeBtn.innerHTML = `<i class="fa-solid fa-heart"></i> ${likes.length}`;
+    likeBtn.onclick = () => toggleProfileLike(u.username);
+    actions.appendChild(likeBtn);
+
+    const chatBtn = document.createElement('button');
+    chatBtn.type = 'button';
+    chatBtn.className = 'discover-chat-btn';
+    chatBtn.title = 'Kostenloser privater Chat';
+    chatBtn.setAttribute('aria-label', 'Privater Chat starten');
+    chatBtn.innerHTML = '<i class="fa-solid fa-comment-dots"></i>';
+    chatBtn.onclick = () => openDirectChat(u.username);
+    actions.appendChild(chatBtn);
+
+    card.appendChild(actions);
+    scroll.appendChild(card);
+  });
 }
 
 function renderSocials(socials){
