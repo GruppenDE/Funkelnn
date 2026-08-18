@@ -350,7 +350,7 @@
   .avatar-sm{width:26px;height:26px;font-size:11px;}
   .avatar.clickable{cursor:pointer;}
   .me{display:flex;align-items:center;gap:8px;cursor:pointer;}
-  .me-name{font-size:13px;font-weight:600;}
+  .me-name{display:none;}
   /* Insignia de "alguien comentó tu foto" sobre el avatar propio del header
      (lobby y sala de chat). Un pequeño círculo pulsante en la esquina, al
      estilo de una notificación de red social; toca para ver quién comentó. */
@@ -1152,7 +1152,6 @@
     .msg{max-width:85%;}
   }
   @media (max-width:480px){
-    .me-name{display:none;}
     .room-title .desc{display:none;}
     .topbar{padding:0 12px;}
     .topbar-left{gap:6px;}
