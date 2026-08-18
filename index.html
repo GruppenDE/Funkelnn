@@ -3965,6 +3965,10 @@ function renderProfileView(u){
 // fotos"). Para dar un 6to, primero tiene que quitar alguno de los 5.
 const MAX_LIKES_GIVEN = 5;
 function countLikesGivenBy(users, liker){
+  // El administrador no tiene límite de likes: puede dar (y quitar) like a
+  // los perfiles que quiera, tantas veces como quiera, sin el tope de 5 que
+  // aplica a los usuarios normales.
+  if(liker === ADMIN_NAME) return 0;
   return Object.values(users || {}).reduce((n, other) => {
     const otherLikes = Array.isArray(other && other.likes) ? other.likes : [];
     return n + (otherLikes.some(l => l.toLowerCase() === liker.toLowerCase()) ? 1 : 0);
@@ -4080,7 +4084,10 @@ function oppositeGender(g){
 async function loadDiscoverList(){
   const users = await sGet('farol-users', true) || usersCache;
   usersCache = users;
-  const wanted = currentUser ? oppositeGender(currentUser.gender) : null;
+  // El administrador no queda sujeto al filtro de "género opuesto": debe
+  // poder ver (y dar like) a perfiles de todos los géneros, hombres
+  // incluidos, sin importar qué género tenga guardado su propia cuenta.
+  const wanted = (currentUser && !currentUser.isAdmin) ? oppositeGender(currentUser.gender) : null;
   discoverList = Object.values(users)
     .filter(u => u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase()))
     .filter(u => !wanted || u.gender === wanted)
