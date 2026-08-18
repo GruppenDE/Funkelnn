@@ -2116,11 +2116,21 @@ const confirmedAvatarUrls = new Set();
 // suscriptores activos en ese momento, así se corrigen solos sin esperar
 // a otro refresh.
 const avatarRepaintSubscribers = {}; // username -> Set<fn(url)>
-function subscribeAvatarRepaint(username, fn){
+// "el" (el elemento DOM que este suscriptor repinta) se guarda junto con
+// el callback SOLO para poder podarlo después (ver pruneAvatarSubscribers).
+// Antes no se guardaba nada y cada suscripción vivía para siempre, incluso
+// después de que su elemento fuera eliminado del DOM (por ejemplo al
+// repintar la lista de mensajes) — con el sondeo cada 3s y cada mensaje
+// nuevo repintando TODOS los avatares de la sala, estas suscripciones
+// fantasma se acumulaban sin límite y terminaban agotando la memoria del
+// navegador/app hasta hacerla fallar. Esto es lo que causaba que la app
+// se cerrara sola tras usar un chat (privado o no) un rato.
+function subscribeAvatarRepaint(username, fn, el){
   const key = username.toLowerCase();
   if(!avatarRepaintSubscribers[key]) avatarRepaintSubscribers[key] = new Set();
-  avatarRepaintSubscribers[key].add(fn);
-  return () => { if(avatarRepaintSubscribers[key]) avatarRepaintSubscribers[key].delete(fn); };
+  const entry = {fn, el};
+  avatarRepaintSubscribers[key].add(entry);
+  return () => { if(avatarRepaintSubscribers[key]) avatarRepaintSubscribers[key].delete(entry); };
 }
 // Guarda la foto más reciente que sepamos de "username" (memoria +
 // localStorage) y avisa a todo el que esté suscrito a repintarla ahora
@@ -2132,7 +2142,20 @@ function notifyAvatarUpdated(username, url){
   avatarCache[key] = url || null;
   setLocalAvatarCache(key, url || null);
   const subs = avatarRepaintSubscribers[key];
-  if(subs) subs.forEach(fn => { try{ fn(url || null); }catch(e){} });
+  if(subs) subs.forEach(entry => { try{ entry.fn(url || null); }catch(e){} });
+}
+// Barre el registro y descarta cualquier suscriptor cuyo elemento ya no
+// esté en el DOM (mensajes/filas viejas que se volvieron a pintar). Se
+// llama en cada ciclo de sondeo (cada 3s) para que la fuga descrita arriba
+// nunca vuelva a acumularse sin límite.
+function pruneAvatarSubscribers(){
+  Object.keys(avatarRepaintSubscribers).forEach(key=>{
+    const set = avatarRepaintSubscribers[key];
+    set.forEach(entry=>{
+      if(entry.el && !document.body.contains(entry.el)) set.delete(entry);
+    });
+    if(set.size === 0) delete avatarRepaintSubscribers[key];
+  });
 }
 
 // avatarCache y confirmedAvatarUrls viven solo en memoria, así que se
@@ -2249,7 +2272,7 @@ function applyAvatarStyle(el, username){
   el.dataset.avatarSubUser = key;
   subscribeAvatarRepaint(username, (url) => {
     if(document.body.contains(el)) paintAvatarEl(el, username, url);
-  });
+  }, el);
   if(avatarCache[key] === undefined){
     sGet(avatarKey(username), true).then(val => {
       // Si el documento nuevo (por usuario) no tiene nada guardado, puede
@@ -3583,6 +3606,7 @@ function startPolling(){
 }
 async function poll(){
   if(!currentUser) return;
+  pruneAvatarSubscribers();
   await refreshUsersCache();
   refreshDmBadge();
   refreshPhotoCommentBadge();
