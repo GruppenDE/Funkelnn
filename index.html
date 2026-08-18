@@ -1955,6 +1955,33 @@ function clearCachedUser(){
 /* ---------------- INIT ---------------- */
 window.addEventListener('DOMContentLoaded', init);
 
+// Traduce errores técnicos de Firebase Auth a mensajes claros y accionables
+// para el usuario, en vez de mostrar el texto crudo de Firebase (con
+// prefijos "Firebase:", códigos "auth/..." etc.), que resulta confuso.
+function friendlyAuthError(err){
+  const code = err && err.code;
+  if(code === 'auth/operation-not-supported-in-this-environment' || code === 'auth/web-storage-unsupported'){
+    return 'Dein Browser blockiert Cookies bzw. den Speicherzugriff, den Funkeln zum Einloggen benötigt. Bitte aktiviere Cookies/Website-Daten für diese Seite (Browsereinstellungen) oder öffne die Seite in Chrome/Safari, und versuche es erneut.';
+  }
+  if(code === 'auth/popup-blocked'){
+    return 'Dein Browser hat das Anmeldefenster von Google blockiert. Bitte erlaube Pop-ups für diese Seite und versuche es erneut.';
+  }
+  if(code === 'auth/network-request-failed'){
+    return 'Keine Internetverbindung. Bitte prüfe deine Verbindung und versuche es erneut.';
+  }
+  if(code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'){
+    return null; // el usuario cerró el popup por su cuenta, no es un error real
+  }
+  return 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
+}
+// Verdadero si sabemos que este navegador bloquea el almacenamiento que
+// Firebase Auth necesita (cookies/IndexedDB deshabilitados, modo privado
+// estricto, etc.). Cuando esto pasa, NINGÚN inicio de sesión (ni manual, ni
+// con Google) puede completarse, así que avisamos apenas se muestre la
+// pantalla de login en vez de dejar que la persona se tope con un error
+// críptico solo al intentar entrar.
+let authStorageBlocked = false;
+
 // Asegura que SIEMPRE haya una sesión de Firebase Authentication activa
 // (aunque sea anónima) antes de tocar Firestore. Esto es necesario porque
 // nuestro login "manual" (usuario/contraseña guardados en Firestore) no
@@ -1980,6 +2007,9 @@ async function ensureFirebaseAuth(){
     return cred.user;
   }catch(e){
     console.error('No se pudo crear una sesión anónima de Firebase Auth', e);
+    if(e && (e.code === 'auth/operation-not-supported-in-this-environment' || e.code === 'auth/web-storage-unsupported')){
+      authStorageBlocked = true;
+    }
     return null;
   }
 }
@@ -2099,6 +2129,12 @@ function showAuth(){
   hideLoadingScreen();
   document.getElementById('view-auth').classList.remove('hidden');
   document.getElementById('view-chat').classList.add('hidden');
+  // Si detectamos que este navegador bloquea el almacenamiento que Firebase
+  // Auth necesita, avisamos de una vez en vez de dejar que la persona se
+  // tope con el error recién al intentar entrar.
+  if(authStorageBlocked){
+    showError(friendlyAuthError({code:'auth/operation-not-supported-in-this-environment'}));
+  }
 }
 
 async function showChat(){
@@ -2292,7 +2328,13 @@ async function handleLogin(e){
     try{
       await auth.signInWithEmailAndPassword(ADMIN_EMAIL, password);
     }catch(err){
-      showError('Benutzername oder Passwort falsch.');
+      // Si el navegador bloquea el almacenamiento que Firebase necesita, el
+      // problema no es la contraseña — mostramos el motivo real.
+      if(err && (err.code === 'auth/operation-not-supported-in-this-environment' || err.code === 'auth/web-storage-unsupported')){
+        showError(friendlyAuthError(err));
+      }else{
+        showError('Benutzername oder Passwort falsch.');
+      }
       return;
     }
     currentUser = buildAdminUser();
@@ -2326,8 +2368,8 @@ async function signInWithGoogle(){
     result = await auth.signInWithPopup(provider);
   }catch(err){
     console.warn('Google-Anmeldung fehlgeschlagen', err);
-    if(err && err.code === 'auth/popup-closed-by-user') return; // el usuario cerró el popup, no mostramos error
-    showError(err && err.message ? err.message : 'Google-Anmeldung fehlgeschlagen.');
+    const msg = friendlyAuthError(err || {});
+    if(msg) showError(msg); // null = el usuario cerró el popup por su cuenta, no mostramos error
     return;
   }
 
