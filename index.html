@@ -562,22 +562,21 @@
   .profile-dm-btn{width:auto;padding:8px 16px;font-size:13px;display:inline-flex;align-items:center;gap:7px;}
   .profile-body{padding:18px 24px 26px;}
   .profile-bio{font-size:13.5px;color:var(--text-cream);line-height:1.6;margin:6px 0 18px;white-space:pre-wrap;}
-  .social-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
+  .social-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px;}
   .social-chip{
-    display:flex;align-items:center;gap:6px;background:var(--bg-void);border:1px solid rgba(255,255,255,.08);
-    border-radius:20px;padding:6px 12px;font-size:12.5px;color:var(--text-cream);text-decoration:none;
-  }
-  .social-chip:hover{border-color:var(--border-glow);}
-  .social-chip-icon{
-    width:20px;height:20px;border-radius:6px;flex:0 0 auto;
     display:flex;align-items:center;justify-content:center;
+    width:38px;height:38px;border-radius:11px;
+    background:var(--bg-card);border:1px solid rgba(255,255,255,.08);
+    text-decoration:none;
+    transition:background .15s ease,border-color .15s ease,transform .15s ease;
   }
-  .social-chip-icon svg{width:12px;height:12px;display:block;}
-  .social-chip[href*="t.me"] .social-chip-icon{background:#29A9EA;}
-  .social-chip[href*="wa.me"] .social-chip-icon{background:#25D366;}
-  .social-chip[href*="facebook.com"] .social-chip-icon{background:#1877F2;}
-  .social-chip[href*="instagram.com"] .social-chip-icon{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);}
-  .social-chip[href*="x.com"] .social-chip-icon{background:#000;}
+  .social-chip:hover{transform:translateY(-2px);border-color:transparent;}
+  .social-chip svg{width:19px;height:19px;display:block;fill:#fff;}
+  .social-chip.ic-telegram:hover{background:#29A9EA;}
+  .social-chip.ic-whatsapp:hover{background:#25D366;}
+  .social-chip.ic-facebook:hover{background:#1877F2;}
+  .social-chip.ic-instagram:hover{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);}
+  .social-chip.ic-twitter:hover{background:#000;}
   .social-empty{font-size:12.5px;color:var(--text-muted);}
 
   /* ---------- TOASTS ---------- */
@@ -3234,8 +3233,10 @@ function renderSocials(socials){
     a.href = p.build(val);
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
-    a.className = 'social-chip';
-    a.innerHTML = `<span class="social-chip-icon">${p.icon}</span>${p.label}`;
+    a.className = 'social-chip ic-' + p.key;
+    a.title = p.label;
+    a.setAttribute('aria-label', p.label);
+    a.innerHTML = p.icon;
     row.appendChild(a);
   });
   if(!any){
