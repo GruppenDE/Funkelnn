@@ -1767,13 +1767,13 @@
       <div class="field">
         <label>Ich bin</label>
         <select id="gender-modal-select">
+          <option value="" disabled selected>Wähle eine Option</option>
           <option value="male">Mann</option>
           <option value="female">Frau</option>
           <option value="other">Divers</option>
         </select>
       </div>
       <div class="modal-actions">
-        <button class="btn-ghost" onclick="skipGenderModal()">Später</button>
         <button class="btn-primary" onclick="saveGenderModal()">Speichern</button>
       </div>
     </div>
@@ -2688,12 +2688,15 @@ async function showChat(){
   // vez que se entra a la app; el usuario la cierra (✕) para ir al lobby.
   openDiscoverView();
   // Cuentas creadas con Google (o cuentas antiguas de antes de que existiera
-  // este campo) no tienen género guardado todavía. Solo el administrador
-  // puede asignar/cambiar género (desde el panel de admin), así que este
-  // modal automático es exclusivamente para su propia cuenta — a un
-  // usuario normal sin género no le sirve de nada verlo, ya que no puede
-  // guardarlo él mismo.
-  if(currentUser && currentUser.isAdmin && !currentUser.gender){
+  // este campo) no tienen género guardado todavía. Antes este modal
+  // automático se mostraba SOLO al administrador — cualquier usuario nuevo
+  // normal que entrara con Google se quedaba para siempre sin género, y por
+  // lo tanto sin filtro de "Descubrir" (aparecía sin filtrar y veía/era
+  // visto por todo el mundo, mezclado). Ahora se le pide a CUALQUIER cuenta
+  // sin género guardado, apenas entra, sin importar si es admin o no — y,
+  // al ser obligatorio (sin botón "Später" visible), no puede seguir
+  // usando la app sin haber elegido.
+  if(currentUser && !currentUser.gender){
     openGenderModal();
   }
 }
@@ -2702,11 +2705,24 @@ async function showChat(){
 function openGenderModal(){
   document.getElementById('gender-modal').classList.remove('hidden');
 }
+// Ya no existe un botón "Später": elegir género es obligatorio para poder
+// usar "Descubrir" con el filtro correcto (ver showChat más arriba). Se
+// deja esta función solo porque el sistema de navegación con el botón
+// "atrás" (más abajo en el archivo) todavía puede referenciarla como
+// cierre de reserva.
 function skipGenderModal(){
   document.getElementById('gender-modal').classList.add('hidden');
 }
 async function saveGenderModal(){
-  const gender = document.getElementById('gender-modal-select').value;
+  const select = document.getElementById('gender-modal-select');
+  const gender = select.value;
+  // Con el placeholder deshabilitado como primera opción, un envío sin
+  // elegir nada real deja gender === "" — lo bloqueamos acá para que nadie
+  // quede guardado sin querer con el primer valor de la lista.
+  if(!gender){
+    showToast('Bitte wähle eine Option aus.', 'error');
+    return;
+  }
   if(!currentUser) return;
   const key = currentUser.username.toLowerCase();
   let u = null;
@@ -5505,23 +5521,13 @@ async function handleAddComment(e){
   registerNavItem('photoNotif', 'openPhotoNotifications', 'closePhotoNotifications');
   registerNavItem('deleteUser', 'confirmDeleteUser', 'closeDeleteUserModal');
   registerNavItem('bannerPos', 'openBannerPositionModal', 'closeBannerPositionModal');
-  registerNavItem('gender', 'openGenderModal', 'skipGenderModal');
+  // El modal de género YA NO se registra acá a propósito: elegir género es
+  // obligatorio (no tiene botón "Später"), así que tampoco debe poder
+  // cerrarse con el botón "atrás" del celular/navegador sin haber guardado.
   registerNavItem('lightbox', 'openLightbox', 'closeLightbox');
   registerNavItem('discover', 'openDiscoverView', 'closeDiscoverView');
   registerNavItem('chat', ['enterRoom', 'openDirectChat', 'openDirectChatByUsers'], 'backToLobby');
 
-  // El modal de género también se puede cerrar guardando (saveGenderModal),
-  // no solo saltándolo (skipGenderModal ya está cubierto arriba).
-  if(typeof window.saveGenderModal === 'function'){
-    const originalSaveGender = window.saveGenderModal;
-    window.saveGenderModal = async function(...args){
-      const result = await originalSaveGender.apply(this, args);
-      if(!syncing && navStack.length && navStack[navStack.length - 1].name === 'gender'){
-        history.back();
-      }
-      return result;
-    };
-  }
 
   window.addEventListener('popstate', () => {
     if(navStack.length){
