@@ -1487,7 +1487,7 @@ const ROOM_ICON_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAA
 /* ---------------- CONFIG ---------------- */
 const ROOMS = [
   {id:'ayuda', emoji:'🔞', name:'+18', desc:'Inhalte für Erwachsene', capacity:20},
-  {id:'general', icon:'img', name:'Chatte mit Valeria', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://clicknlook.site/a/Kr54Ni401WhAzBp', special:true},
+  {id:'general', icon:'img', name:'Chatte mit Valeria', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://www.google.com', special:true},
   {id:'ligar', icon:'img', name:'München', desc:'Bier, Tradition und gute Stimmung', capacity:50},
   {id:'musica', icon:'img', name:'Hamburg', desc:'Hafen, Musik und Nachtleben', capacity:35},
   {id:'cine', icon:'img', name:'Frankfurt', desc:'Wolkenkratzer und Finanzrhythmus', capacity:35},
@@ -2027,9 +2027,9 @@ async function init(){
       // admin antes de otorgar el rol.
       await new Promise(resolve => {
         const unsub = auth.onAuthStateChanged(user => { unsub(); resolve(user); });
-      }).then(user => {
+      }).then(async user => {
         if(user && user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()){
-          currentUser = buildAdminUser();
+          currentUser = await loadAdminUser();
           usersCache[ADMIN_NAME.toLowerCase()] = currentUser;
         }
       });
@@ -2116,6 +2116,33 @@ function buildAdminUser(){
     username: ADMIN_NAME, email: ADMIN_EMAIL, passwordHash: null,
     color: ADMIN_COLOR, createdAt: Date.now(), provider: 'admin', isAdmin: true
   };
+}
+
+// buildAdminUser() por sí solo es solo la plantilla base (usuario, correo,
+// color, bandera de admin) — NO incluye la bio ni las redes sociales que el
+// admin haya guardado, porque esos datos viven en el documento compartido
+// 'farol-users'. Esta función junta ambas cosas: la plantilla base (para
+// garantizar que isAdmin/email/color siempre sean correctos, sin depender
+// de lo que haya en Firestore) + los campos de perfil realmente guardados
+// (bio, socials, avatar, banner, posición/zoom del banner). Se usa en cada
+// login/restauración de sesión del admin para que su propio perfil no se
+// vea "en blanco" hasta que lo vuelva a editar.
+async function loadAdminUser(){
+  const base = buildAdminUser();
+  try{
+    const users = await sGet('farol-users', true);
+    const saved = users && users[ADMIN_NAME.toLowerCase()];
+    if(saved){
+      return Object.assign(base, {
+        bio: saved.bio, socials: saved.socials,
+        avatar: saved.avatar, banner: saved.banner,
+        bannerPos: saved.bannerPos, bannerZoom: saved.bannerZoom
+      });
+    }
+  }catch(e){
+    console.warn('No se pudieron cargar los datos de perfil guardados del admin', e);
+  }
+  return base;
 }
 
 function hideLoadingScreen(){
@@ -2394,7 +2421,7 @@ async function handleLogin(e){
       }
       return;
     }
-    currentUser = buildAdminUser();
+    currentUser = await loadAdminUser();
     usersCache[ADMIN_NAME.toLowerCase()] = currentUser;
     await sSet('farol-session', ADMIN_NAME, false);
     showChat();
@@ -3108,11 +3135,18 @@ async function openProfile(username){
   const key = username.toLowerCase();
 
   // Prefer what we know locally about "myself" (always accurate and instant),
-  // then fall back to the shared cache, then to a minimal stand-in so the
-  // panel opens no matter what — it should never silently fail to appear.
+  // then el perfil guardado de verdad en el servidor (bio, redes, etc.), y
+  // solo si NADA de eso existe todavía, un estand-in mínimo para que el
+  // panel abra sin fallar.
+  // IMPORTANTE: antes, `buildAdminUser()` se usaba ANTES de revisar
+  // `usersCache[key]`, así que cualquiera que abriera el perfil del admin
+  // (menos el propio admin, que usa su copia en memoria) siempre veía un
+  // perfil "en blanco" — sin bio ni redes sociales — sin importar lo que el
+  // admin hubiera guardado. `buildAdminUser()` ahora es solo el último
+  // recurso, para cuando el admin todavía no guardó ningún dato.
   let u = (currentUser && currentUser.username.toLowerCase() === key) ? currentUser : null;
-  if(!u && username === ADMIN_NAME) u = buildAdminUser();
   if(!u) u = usersCache[key];
+  if(!u && username === ADMIN_NAME) u = buildAdminUser();
   if(!u) u = {username, color: colorFor(username)};
 
   viewingProfile = u.username;
