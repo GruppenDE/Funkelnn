@@ -1913,6 +1913,37 @@ const bannerCache = {};
 // etc.) — si ya sabemos que la imagen carga, la pintamos directo.
 const confirmedAvatarUrls = new Set();
 
+// ---- Registro central de "quién está mostrando el avatar de quién" ----
+// Antes, cada lugar de la app (mensajes, perfil, Descubrir) tenía su propia
+// lógica de caché de avatar, y cuando UNO de ellos confirmaba una foto más
+// nueva contra Firestore, los demás no se enteraban — por eso a veces,
+// después de F5, "Descubrir" se quedaba pegado mostrando una foto vieja
+// (la de localStorage) aunque en Firestore ya hubiera una más reciente.
+// Con este registro, cualquier función de pintado se suscribe con un
+// callback de "repintame con esta URL"; en cuanto CUALQUIER parte de la
+// app confirma una foto nueva para ese usuario, se avisa a todos los
+// suscriptores activos en ese momento, así se corrigen solos sin esperar
+// a otro refresh.
+const avatarRepaintSubscribers = {}; // username -> Set<fn(url)>
+function subscribeAvatarRepaint(username, fn){
+  const key = username.toLowerCase();
+  if(!avatarRepaintSubscribers[key]) avatarRepaintSubscribers[key] = new Set();
+  avatarRepaintSubscribers[key].add(fn);
+  return () => { if(avatarRepaintSubscribers[key]) avatarRepaintSubscribers[key].delete(fn); };
+}
+// Guarda la foto más reciente que sepamos de "username" (memoria +
+// localStorage) y avisa a todo el que esté suscrito a repintarla ahora
+// mismo. SIEMPRE hay que llamar a esto (en vez de tocar avatarCache /
+// setLocalAvatarCache directo) cada vez que se confirma un valor fresco
+// desde Firestore, para que la corrección se propague a toda la app.
+function notifyAvatarUpdated(username, url){
+  const key = username.toLowerCase();
+  avatarCache[key] = url || null;
+  setLocalAvatarCache(key, url || null);
+  const subs = avatarRepaintSubscribers[key];
+  if(subs) subs.forEach(fn => { try{ fn(url || null); }catch(e){} });
+}
+
 // avatarCache y confirmedAvatarUrls viven solo en memoria, así que se
 // vacían cada vez que se refresca la página — por eso el avatar tardaba en
 // aparecer después de un F5 (había que volver a pedirlo a Firestore antes
@@ -1996,13 +2027,17 @@ function applyAvatarStyle(el, username){
     if(cached) known = cached;
   }
   paintAvatarEl(el, username, known);
+  // Nos suscribimos a futuras correcciones para ESTE elemento concreto: si
+  // en cualquier momento otra parte de la app (Descubrir, otro mensaje,
+  // etc.) confirma una foto distinta a la que ya pintamos, este avatar se
+  // actualiza solo, sin esperar a otro F5.
+  el.dataset.avatarSubUser = key;
+  subscribeAvatarRepaint(username, (url) => {
+    if(document.body.contains(el)) paintAvatarEl(el, username, url);
+  });
   if(avatarCache[key] === undefined){
     sGet(avatarKey(username), true).then(val => {
-      avatarCache[key] = val || null;
-      setLocalAvatarCache(key, val || null);
-      // Solo repintamos si es distinto de lo que ya mostramos (evita un
-      // parpadeo innecesario cuando la foto de localStorage ya era la buena).
-      if(val && val !== known) paintAvatarEl(el, username, val);
+      notifyAvatarUpdated(username, val);
     }).catch(()=>{ avatarCache[key] = null; });
   }
 }
@@ -2075,14 +2110,21 @@ async function preloadAvatarsFor(usernames){
       const cached = getLocalAvatarCache(key);
       if(cached !== null){
         avatarCache[key] = cached;
+        // OJO: esta corrección de fondo antes actualizaba avatarCache en
+        // silencio y nadie se enteraba si la foto real había cambiado —
+        // por eso, aunque Firestore ya tuviera la nueva foto, seguía
+        // viéndose la vieja (de localStorage) hasta el próximo F5, o para
+        // siempre si esa parte de la pantalla no se volvía a pintar. Ahora
+        // avisamos por notifyAvatarUpdated para que todo lo que esté
+        // suscrito (Descubrir, mensajes, perfil) se corrija solo.
         sGet(avatarKey(key), true).then(val => {
-          avatarCache[key] = val || null;
-          setLocalAvatarCache(key, val || null);
+          notifyAvatarUpdated(key, val);
         }).catch(()=>{});
       }else{
         try{
-          avatarCache[key] = (await sGet(avatarKey(key), true)) || null;
-          setLocalAvatarCache(key, avatarCache[key]);
+          const val = (await sGet(avatarKey(key), true)) || null;
+          avatarCache[key] = val;
+          setLocalAvatarCache(key, val);
         }
         catch(e){ avatarCache[key] = null; }
       }
@@ -4114,6 +4156,7 @@ function updateDiscoverLikeUI(u){
 // caché/localStorage al instante (sin parpadeo), y confirma/actualiza con
 // Firestore en segundo plano — mismo patrón que applyAvatarStyle, pero
 // mostrando el resultado a pantalla completa en vez de en un círculo chico.
+let discoverAvatarUnsub = null;
 async function paintDiscoverPhoto(username){
   const key = username.toLowerCase();
   function paint(url){
@@ -4129,19 +4172,26 @@ async function paintDiscoverPhoto(username){
       initialsEl.textContent = initials(username);
     }
   }
+  // "Descubrir" es a pantalla completa y es justo donde más se nota una
+  // foto vieja, así que acá no confiamos ciegamente en que avatarCache ya
+  // tenga el valor correcto (pudo haberse llenado antes, en otra pantalla,
+  // con lo último que había en localStorage). Pintamos ESO de entrada nomás
+  // para que no tarde en aparecer algo, pero después SIEMPRE confirmamos
+  // contra Firestore para esta tarjeta puntual.
   let known = (avatarCache[key] !== undefined) ? avatarCache[key] : (userLookup(username).avatar || getLocalAvatarCache(key));
   paint(known);
-  if(avatarCache[key] === undefined){
-    try{
-      const val = await sGet(avatarKey(username), true);
-      avatarCache[key] = val || null;
-      setLocalAvatarCache(key, val || null);
-      // Solo repintamos si la tarjeta sigue mostrando a esta misma persona
-      // (el usuario pudo haber pasado a la siguiente mientras cargaba).
-      const current = discoverList[discoverIndex];
-      if(current && current.username.toLowerCase() === key) paint(val);
-    }catch(e){}
-  }
+  if(discoverAvatarUnsub) discoverAvatarUnsub();
+  discoverAvatarUnsub = subscribeAvatarRepaint(username, (url) => {
+    const current = discoverList[discoverIndex];
+    if(current && current.username.toLowerCase() === key) paint(url);
+  });
+  try{
+    const val = await sGet(avatarKey(username), true);
+    // notifyAvatarUpdated guarda el valor confirmado y avisa a todo lo que
+    // esté suscrito a este usuario (incluida esta misma tarjeta si sigue
+    // mostrándolo), no solo a esta función.
+    notifyAvatarUpdated(username, val);
+  }catch(e){}
 }
 
 function discoverToggleLike(){
@@ -4259,13 +4309,24 @@ async function handleAvatarFile(e){
     const dataUrl = await resizeImageFile(file, targetSize, targetSize, 0.88, 900 * 1024);
     const key = currentUser.username.toLowerCase();
     const ok = await sSetCritical(avatarKey(currentUser.username), dataUrl, true);
-    avatarCache[key] = dataUrl;
-    setLocalAvatarCache(key, dataUrl);
-    currentUser.avatar = dataUrl; // solo en memoria, para esta sesión
-    if(usersCache[key]) usersCache[key].avatar = dataUrl;
+    if(ok){
+      // Solo si REALMENTE quedó guardada en Firestore confirmamos la foto
+      // nueva y avisamos a toda la app (Descubrir, mensajes, perfil, etc.)
+      // vía notifyAvatarUpdated. Antes esto se hacía sin importar si el
+      // guardado había fallado: el dueño veía su foto nueva en su propio
+      // celular (porque quedaba en su caché local), pero como en Firestore
+      // seguía la vieja, todos los demás —y el mismo dueño tras un F5 o en
+      // otro dispositivo— seguían viendo la foto vieja para siempre. Ahora,
+      // si falla, NO se toca la caché: se mantiene coherente con lo que de
+      // verdad hay guardado, y el mensaje de abajo avisa que hay que
+      // reintentar.
+      notifyAvatarUpdated(currentUser.username, dataUrl);
+      currentUser.avatar = dataUrl; // solo en memoria, para esta sesión
+      if(usersCache[key]) usersCache[key].avatar = dataUrl;
+    }
     renderProfileView(currentUser);
     refreshMyAvatarUI();
-    showToast(ok ? 'Profilbild aktualisiert.' : 'Lokal aktualisiert, konnte aber nicht auf dem Server gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
+    showToast(ok ? 'Profilbild aktualisiert.' : 'Das Profilbild konnte nicht gespeichert werden. Versuche es erneut oder mit einem kleineren Bild.', ok ? 'success' : 'error');
   }catch(err){
     console.error(err);
     showToast('Das Profilbild konnte nicht hochgeladen werden. Versuche es mit einem kleineren Bild.', 'error');
