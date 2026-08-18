@@ -2300,16 +2300,30 @@ async function handleRegister(e){
   }
   if(password.length < 6){ showError('Das Passwort muss mindestens 6 Zeichen lang sein.'); return; }
 
-  const users = await sGet('farol-users', true) || {};
   const key = username.toLowerCase();
-  if(users[key]){ showError('Dieser Benutzername ist bereits vergeben.'); return; }
-
-  users[key] = {
-    username, email, passwordHash: hashPw(password),
-    color: colorFor(username), createdAt: Date.now(), provider: 'manual'
-  };
-  await sSet('farol-users', users, true);
-  currentUser = users[key];
+  let newUser = null;
+  let taken = false;
+  try{
+    // Transacción atómica: lee y escribe "farol-users" en un solo paso para
+    // que dos registros (u otra edición a este documento) al mismo tiempo
+    // no se pisen entre sí y borren cuentas existentes.
+    await sTransact('farol-users', (users) => {
+      users = users || {};
+      if(users[key]){ taken = true; return users; }
+      newUser = {
+        username, email, passwordHash: hashPw(password),
+        color: colorFor(username), createdAt: Date.now(), provider: 'manual'
+      };
+      users[key] = newUser;
+      return users;
+    });
+  }catch(e){
+    console.error('Registrierung fehlgeschlagen', e);
+    showError('Registrierung fehlgeschlagen. Bitte versuche es erneut.');
+    return;
+  }
+  if(taken){ showError('Dieser Benutzername ist bereits vergeben.'); return; }
+  currentUser = newUser;
   usersCache[key] = currentUser;
   cacheUserLocally(currentUser);
   await sSet('farol-session', username, false);
@@ -2378,16 +2392,29 @@ async function signInWithGoogle(){
   const email = gUser.email || '';
   const key = name.toLowerCase().replace(/\s+/g,'');
 
-  const users = await sGet('farol-users', true) || {};
-  if(!users[key]){
-    users[key] = {
-      username: name, email, passwordHash: null,
-      color: colorFor(name), createdAt: Date.now(),
-      provider: 'google', googleUid: gUser.uid, photoURL: gUser.photoURL || null
-    };
-    await sSet('farol-users', users, true);
+  let user = null;
+  try{
+    // Transacción atómica: igual que en el registro manual, para que crear
+    // esta cuenta (si es la primera vez que este usuario de Google entra)
+    // no pise cambios de otras personas hechos al mismo documento.
+    await sTransact('farol-users', (users) => {
+      users = users || {};
+      if(!users[key]){
+        users[key] = {
+          username: name, email, passwordHash: null,
+          color: colorFor(name), createdAt: Date.now(),
+          provider: 'google', googleUid: gUser.uid, photoURL: gUser.photoURL || null
+        };
+      }
+      user = users[key];
+      return users;
+    });
+  }catch(e){
+    console.error('Google-Anmeldung fehlgeschlagen', e);
+    showError('Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+    return;
   }
-  currentUser = users[key];
+  currentUser = user;
   usersCache[key] = currentUser;
   cacheUserLocally(currentUser);
   await sSet('farol-session', currentUser.username, false);
@@ -2793,10 +2820,15 @@ async function executeDeleteUser(){
   btn.disabled = true;
 
   try{
-    // 1) Sacarlo del documento compartido de usuarios.
-    const users = await sGet('farol-users', true) || {};
-    delete users[key];
-    await sSet('farol-users', users, true);
+    // 1) Sacarlo del documento compartido de usuarios (transacción atómica,
+    // para no pisar ediciones simultáneas de otras personas).
+    let users = null;
+    await sTransact('farol-users', (u) => {
+      u = u || {};
+      delete u[key];
+      users = u;
+      return u;
+    });
     usersCache = users;
 
     // 2) Borrar sus documentos propios (avatar, banner, galería).
@@ -3493,14 +3525,26 @@ async function saveProfile(){
     }
   }
 
-  const users = await sGet('farol-users', true) || usersCache;
   const key = currentUser.username.toLowerCase();
-  const u = users[key] || currentUser;
-  u.bio = document.getElementById('edit-bio').value.trim().slice(0, 220);
-  u.socials = rawSocials;
-  users[key] = u;
-  await sSet('farol-users', users, true);
-  usersCache = users;
+  const newBio = document.getElementById('edit-bio').value.trim().slice(0, 220);
+  let u = null;
+  try{
+    // Transacción atómica: evita que este guardado pise (o sea pisado por)
+    // otra edición al mismo documento compartido ocurrida al mismo tiempo.
+    await sTransact('farol-users', (users) => {
+      users = users || {};
+      u = users[key] || currentUser;
+      u.bio = newBio;
+      u.socials = rawSocials;
+      users[key] = u;
+      return users;
+    });
+  }catch(e){
+    console.error('Profil konnte nicht gespeichert werden', e);
+    showToast('Konnte nicht gespeichert werden. Versuche es erneut.', 'error');
+    return;
+  }
+  usersCache[key] = u;
   currentUser = u;
   renderProfileView(u);
   refreshMyAvatarUI();
@@ -3704,16 +3748,22 @@ async function saveBannerPosition(){
   // en vez de un documento propio, para no depender de un permiso de
   // escritura nuevo en las reglas de Firestore.
   const key = currentUser.username.toLowerCase();
-  const users = await sGet('farol-users', true) || usersCache;
-  const u = users[key] || currentUser;
-  u.bannerPos = posStr;
-  u.bannerZoom = zoom;
-  users[key] = u;
   let ok = true;
-  try{ await sSet('farol-users', users, true); }catch(e){ ok = false; }
-  usersCache = users;
+  try{
+    // Transacción atómica: mismo motivo que en el resto de escrituras a
+    // este documento compartido.
+    await sTransact('farol-users', (users) => {
+      users = users || {};
+      const u = users[key] || currentUser;
+      u.bannerPos = posStr;
+      u.bannerZoom = zoom;
+      users[key] = u;
+      return users;
+    });
+  }catch(e){ ok = false; }
   currentUser.bannerPos = posStr;
   currentUser.bannerZoom = zoom;
+  if(usersCache[key]){ usersCache[key].bannerPos = posStr; usersCache[key].bannerZoom = zoom; }
   applyBannerPosition(document.getElementById('profile-banner'), posStr, zoom);
   closeBannerPositionModal();
   showToast(ok ? 'Bannerposition gespeichert.' : 'Konnte nicht gespeichert werden. Versuche es erneut.', ok ? 'success' : 'error');
