@@ -882,28 +882,77 @@
     text-overflow:ellipsis;
   }
   .discover-full-actions{
-    display:flex;align-items:center;justify-content:center;gap:22px;flex:0 0 auto;padding:16px 0 4px;
+    display:flex;align-items:center;justify-content:center;gap:26px;flex:0 0 auto;padding:18px 0 4px;
   }
   .discover-full-actions.hidden{display:none;}
   .discover-full-btn{
     border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
-    background:var(--bg-card);color:var(--text-cream);box-shadow:0 6px 16px rgba(0,0,0,.3);
+    background:var(--bg-card);color:var(--text-cream);
+    box-shadow:0 8px 20px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+    transition:transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease, background .25s ease,
+      border-color .25s ease, color .2s ease;
   }
-  .discover-full-skip{width:52px;height:52px;font-size:18px;color:var(--text-muted);}
+  .discover-full-btn:hover{transform:translateY(-3px);}
+  .discover-full-btn:active{transform:translateY(0) scale(.9);}
+  .discover-full-btn i{transition:transform .25s ease, color .25s ease;}
+
+  /* Saltar: circulo "vidrio" discreto, se ilumina apenas al pasar el mouse */
+  .discover-full-skip{
+    width:52px;height:52px;font-size:17px;color:var(--text-muted);
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  }
+  .discover-full-skip:hover{color:var(--text-cream);background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.16);}
+  .discover-full-skip:hover i{transform:translateX(2px);}
+
+  /* Like: la acción principal, con más presencia y un "latido" al activarse */
   .discover-full-like{
-    width:66px;height:66px;flex-direction:column;gap:2px;border:2px solid transparent;
+    width:70px;height:70px;flex-direction:column;gap:1px;
+    background:linear-gradient(160deg,var(--bg-card) 0%,var(--bg-card-2) 100%);
+    border:2px solid rgba(255,61,107,.22);
   }
-  .discover-full-like i{font-size:24px;color:var(--text-muted);}
-  .discover-full-like span{font-size:11px;font-weight:700;color:var(--text-muted);}
-  .discover-full-like.liked{border-color:rgba(255,61,107,.5);}
-  .discover-full-like.liked i,.discover-full-like.liked span{color:var(--accent-coral);}
-  .discover-full-chat{width:56px;height:56px;font-size:20px;background:var(--accent-amber);color:#2b0618;}
+  .discover-full-like i{font-size:23px;color:var(--text-muted);}
+  .discover-full-like span{font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.2px;}
+  .discover-full-like:hover{border-color:rgba(255,61,107,.55);}
+  .discover-full-like:hover i{transform:scale(1.12);}
+  .discover-full-like.liked{
+    border-color:transparent;
+    background:linear-gradient(160deg,#ff3d6b 0%,#c81856 100%);
+    box-shadow:0 10px 26px rgba(255,61,107,.45);
+    animation:discoverLikePulse .55s cubic-bezier(.34,1.56,.64,1);
+  }
+  .discover-full-like.liked i,.discover-full-like.liked span{color:#fff;}
+  .discover-full-like.liked i{animation:discoverHeartBeat .55s ease;}
+  @keyframes discoverHeartBeat{
+    0%{transform:scale(1);}
+    35%{transform:scale(1.4);}
+    60%{transform:scale(.92);}
+    100%{transform:scale(1);}
+  }
+  @keyframes discoverLikePulse{
+    0%{box-shadow:0 10px 26px rgba(255,61,107,.45),0 0 0 0 rgba(255,61,107,.5);}
+    70%{box-shadow:0 10px 26px rgba(255,61,107,.45),0 0 0 12px rgba(255,61,107,0);}
+    100%{box-shadow:0 10px 26px rgba(255,61,107,.45),0 0 0 0 rgba(255,61,107,0);}
+  }
+
+  /* Chat: acento de marca, se siente como el siguiente paso natural */
+  .discover-full-chat{
+    width:56px;height:56px;font-size:19px;color:#2b0618;
+    background:linear-gradient(145deg,#ff6fbb 0%,var(--accent-amber) 100%);
+    box-shadow:0 8px 22px rgba(255,46,156,.4);
+  }
+  .discover-full-chat:hover{box-shadow:0 12px 28px rgba(255,46,156,.55);}
+  .discover-full-chat:hover i{transform:scale(1.1) rotate(-6deg);}
+
   .discover-full-empty{margin:auto;color:var(--text-muted);font-size:14px;text-align:center;padding:40px 20px;}
   .discover-full-empty.hidden{display:none;}
   @media (max-width:480px){
     .discover-full-name{font-size:21px;}
     .discover-full-initials{font-size:68px;}
-    .discover-full-btn.discover-full-like{width:60px;height:60px;}
+    .discover-full-btn.discover-full-like{width:62px;height:62px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .discover-full-btn,.discover-full-btn i,.discover-full-like.liked{animation:none !important;transition:none !important;}
   }
 
 
