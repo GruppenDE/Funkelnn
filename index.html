@@ -5343,6 +5343,97 @@ async function handleAddComment(e){
   }
 }
 
+/* ================= BOTÓN "ATRÁS" DEL CELULAR (no salir de la app) =================
+   Problema: la app nunca usaba history.pushState, así que para el navegador
+   no había "pantallas" que retroceder — el primer gesto/botón "atrás" salía
+   directo de la página.
+   Solución: cada vez que se abre un panel (perfil, admin, notificaciones,
+   discover, una sala de chat, etc.) empujamos un estado al historial. El
+   botón "atrás" del celular dispara "popstate", y en vez de dejar que el
+   navegador salga de la página, cerramos ese panel. Si ya no hay ningún
+   panel abierto (estamos en el lobby, la pantalla base), en lugar de dejar
+   que el back salga de la app, volvemos a insertar un estado para "atrapar"
+   ese back y que la app nunca se cierre sola. */
+(function(){
+  const navStack = [];   // pila de paneles abiertos: {name, close}
+  let syncing = false;   // true mientras estamos respondiendo a un popstate
+
+  // Registra un par abrir/cerrar. openNames puede ser un solo nombre o una
+  // lista (p.ej. una sala se puede "abrir" desde varias funciones distintas
+  // pero siempre se cierra con la misma).
+  function registerNavItem(name, openNames, closeName){
+    if(!Array.isArray(openNames)) openNames = [openNames];
+    const originalClose = window[closeName];
+    if(typeof originalClose !== 'function') return;
+
+    openNames.forEach(openName => {
+      const originalOpen = window[openName];
+      if(typeof originalOpen !== 'function') return;
+      window[openName] = function(...args){
+        const result = originalOpen.apply(this, args);
+        if(!navStack.length || navStack[navStack.length - 1].name !== name){
+          navStack.push({name, close: originalClose});
+          history.pushState({funkelnNav: name}, '');
+        }
+        return result;
+      };
+    });
+
+    window[closeName] = function(...args){
+      // Si venimos de un popstate, solo ejecutamos el cierre real.
+      if(syncing) return originalClose.apply(this, args);
+      // Si el cierre se disparó a mano (botón X, click afuera, etc.),
+      // retrocedemos el historial para mantenerlo sincronizado; el cierre
+      // real ocurre en el listener de popstate de abajo.
+      if(navStack.length && navStack[navStack.length - 1].name === name){
+        history.back();
+        return;
+      }
+      return originalClose.apply(this, args);
+    };
+  }
+
+  registerNavItem('profile', 'openProfile', 'closeProfile');
+  registerNavItem('admin', 'openAdminPanel', 'closeAdminPanel');
+  registerNavItem('dmList', 'openPrivateChatsList', 'closePrivateChatsList');
+  registerNavItem('photoNotif', 'openPhotoNotifications', 'closePhotoNotifications');
+  registerNavItem('deleteUser', 'confirmDeleteUser', 'closeDeleteUserModal');
+  registerNavItem('bannerPos', 'openBannerPositionModal', 'closeBannerPositionModal');
+  registerNavItem('gender', 'openGenderModal', 'skipGenderModal');
+  registerNavItem('lightbox', 'openLightbox', 'closeLightbox');
+  registerNavItem('discover', 'openDiscoverView', 'closeDiscoverView');
+  registerNavItem('chat', ['enterRoom', 'openDirectChat', 'openDirectChatByUsers'], 'backToLobby');
+
+  // El modal de género también se puede cerrar guardando (saveGenderModal),
+  // no solo saltándolo (skipGenderModal ya está cubierto arriba).
+  if(typeof window.saveGenderModal === 'function'){
+    const originalSaveGender = window.saveGenderModal;
+    window.saveGenderModal = async function(...args){
+      const result = await originalSaveGender.apply(this, args);
+      if(!syncing && navStack.length && navStack[navStack.length - 1].name === 'gender'){
+        history.back();
+      }
+      return result;
+    };
+  }
+
+  window.addEventListener('popstate', () => {
+    if(navStack.length){
+      syncing = true;
+      const top = navStack.pop();
+      try{ top.close(); }
+      catch(err){ console.error('Fehler beim Schließen per Zurück-Taste', err); }
+      syncing = false;
+    } else {
+      // Estamos en la pantalla base: no dejamos que el back salga de la app.
+      history.pushState({funkelnNav: 'root'}, '');
+    }
+  });
+
+  // Estado base para que siempre haya algo que "consumir" antes de intentar salir.
+  history.replaceState({funkelnNav: 'root'}, '');
+})();
+
 /* ================= APP INSTALL BANNER (PWA: Android + iOS) ================= */
 (function(){
   const banner = document.getElementById('app-install-banner');
