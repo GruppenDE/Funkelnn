@@ -2098,7 +2098,7 @@ function buildAvatarEl(username, sizeClass){
   el.onclick = () => openProfile(username);
   return el;
 }
-function resizeImageFile(file, maxW, maxH, quality){
+function resizeImageFile(file, maxW, maxH, quality, maxBytes){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
     reader.onload = () => {
@@ -2108,8 +2108,28 @@ function resizeImageFile(file, maxW, maxH, quality){
         const w = Math.round(img.width*ratio), h = Math.round(img.height*ratio);
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        const ctx = canvas.getContext('2d');
+        // Sin esto, Chrome/Safari a veces usan un algoritmo de escalado más
+        // barato (y más "dentado") al reducir fotos grandes. 'high' usa un
+        // downscale de mejor calidad, así se aprovecha mejor cada pixel que
+        // sí guardamos.
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        let q = quality;
+        let dataUrl = canvas.toDataURL('image/jpeg', q);
+        if(maxBytes){
+          // En vez de fijar de antemano una calidad baja "por las dudas"
+          // (lo que perdía nitidez en fotos simples/chicas), probamos con
+          // la calidad pedida y solo la bajamos de a poco si hace falta
+          // para no pasarnos del límite del documento en Firestore. Así la
+          // mayoría de las fotos se guardan con resolución/calidad completas.
+          while(dataUrl.length > maxBytes && q > 0.5){
+            q -= 0.07;
+            dataUrl = canvas.toDataURL('image/jpeg', q);
+          }
+        }
+        resolve(dataUrl);
       };
       img.onerror = () => reject(new Error('No se pudo leer la imagen'));
       img.src = reader.result;
@@ -4224,13 +4244,19 @@ async function handleAvatarFile(e){
   if(!file) return;
   try{
     // La foto de perfil ya no se usa solo como miniatura circular chica:
-    // en "Descubrir" se muestra a pantalla completa (hasta 480px CSS de
-    // ancho), y en pantallas retina/HiDPI (2x-3x) eso son 960-1440px
-    // físicos reales, más aún de alto. 800x800 se quedaba corto y se veía
-    // pixelada al hacer zoom con "cover". Subimos a 1080x1080: sigue
-    // muy por debajo del límite de 1MB del documento propio del avatar
-    // en Firestore, pero ya cubre pantallas retina sin verse borrosa.
-    const dataUrl = await resizeImageFile(file, 1080, 1080, 0.85);
+    // en "Descubrir" se muestra a pantalla completa. Un tamaño fijo (antes
+    // 800, luego 1080) seguía viéndose pixelado en celulares con pantallas
+    // de alta densidad (2x-3x), porque ahí el navegador necesita muchos
+    // más píxeles reales para cubrir esa área sin estirar la imagen.
+    // Por eso calculamos el tamaño según devicePixelRatio del celular que
+    // sube la foto: en un celular normal (1x) alcanza con menos; en uno
+    // retina/HiDPI (2x-3x) generamos una imagen más grande para que se vea
+    // nítida ahí también. maxBytes es una red de seguridad para no pasarnos
+    // del límite de 1MB del documento del avatar en Firestore aun en
+    // celulares de altísima densidad.
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const targetSize = Math.round(700 * dpr);
+    const dataUrl = await resizeImageFile(file, targetSize, targetSize, 0.88, 900 * 1024);
     const key = currentUser.username.toLowerCase();
     const ok = await sSetCritical(avatarKey(currentUser.username), dataUrl, true);
     avatarCache[key] = dataUrl;
