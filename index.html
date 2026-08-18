@@ -4601,6 +4601,21 @@ async function toggleProfileLike(username){
 // arrancar un chat privado gratuito directo desde ahí.
 let discoverList = [];
 let discoverIndex = 0;
+// Temporizador que, mientras la pantalla "Descubrir" está abierta, vuelve a
+// elegir 5 perfiles de mujeres al azar cada 5 minutos (ver loadDiscoverList
+// y openDiscoverView/closeDiscoverView más abajo).
+let discoverRefreshTimer = null;
+const DISCOVER_REFRESH_MS = 5 * 60 * 1000;
+const DISCOVER_RANDOM_COUNT = 5;
+// Mezcla in-place con Fisher-Yates — usado para elegir perfiles al azar sin
+// sesgar hacia el principio/final del array original.
+function shuffleArray(arr){
+  for(let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 // Conjunto (nombres en minúscula) de perfiles que cuentan como "nuevos" para
 // ESTE usuario en la apertura actual de Descubrir. Se calcula una sola vez
 // al abrir la pantalla (comparando contra la marca de tiempo guardada la
@@ -4666,15 +4681,25 @@ async function loadDiscoverList(){
   // poder ver (y dar like) a perfiles de todos los géneros, hombres
   // incluidos, sin importar qué género tenga guardado su propia cuenta.
   const wanted = (currentUser && !currentUser.isAdmin) ? oppositeGender(currentUser.gender) : null;
-  discoverList = Object.values(users)
+  let list = Object.values(users)
     .filter(u => u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase()))
-    .filter(u => !wanted || u.gender === wanted)
-    // Los perfiles con más likes aparecen primero, para que descubrir se
-    // sienta vivo; en empate, orden alfabético estable.
-    .sort((a, b) => {
-      const diff = (b.likes || []).length - (a.likes || []).length;
-      return diff !== 0 ? diff : a.username.localeCompare(b.username);
-    });
+    .filter(u => !wanted || u.gender === wanted);
+
+  // Pedido específico: un usuario registrado como "hombre" (currentUser.gender
+  // === 'male', o sea wanted === 'female') ve SOLO 5 perfiles de mujeres,
+  // elegidos al azar en cada carga — en vez de la lista completa ordenada
+  // por likes que se usa para el resto de los casos.
+  if(currentUser && !currentUser.isAdmin && currentUser.gender === 'male' && wanted === 'female'){
+    discoverList = shuffleArray(list).slice(0, DISCOVER_RANDOM_COUNT);
+    return;
+  }
+
+  // Los perfiles con más likes aparecen primero, para que descubrir se
+  // sienta vivo; en empate, orden alfabético estable.
+  discoverList = list.sort((a, b) => {
+    const diff = (b.likes || []).length - (a.likes || []).length;
+    return diff !== 0 ? diff : a.username.localeCompare(b.username);
+  });
 }
 
 async function openDiscoverView(){
@@ -4702,6 +4727,19 @@ async function openDiscoverView(){
   // volverán a marcarse la próxima vez que se abra esta pantalla.
   setDiscoverLastSeen(Date.now());
   refreshDiscoverNewBadge();
+
+  // Mientras se quede en esta pantalla, cada 5 minutos se vuelve a elegir
+  // una nueva selección al azar (solo tiene efecto visible para hombres,
+  // que son los únicos con la selección aleatoria de 5 — ver loadDiscoverList).
+  // Se limpia cualquier temporizador previo por si esta función se llama
+  // de nuevo sin haber pasado por closeDiscoverView.
+  if(discoverRefreshTimer) clearInterval(discoverRefreshTimer);
+  discoverRefreshTimer = setInterval(async () => {
+    if(currentView !== 'discover') return;
+    await loadDiscoverList();
+    discoverIndex = 0;
+    renderDiscoverCard();
+  }, DISCOVER_REFRESH_MS);
 }
 
 function closeDiscoverView(){
@@ -4709,6 +4747,7 @@ function closeDiscoverView(){
   document.getElementById('view-lobby').classList.remove('hidden');
   document.getElementById('view-lobby').classList.add('view-fade');
   currentView = 'lobby';
+  if(discoverRefreshTimer){ clearInterval(discoverRefreshTimer); discoverRefreshTimer = null; }
 }
 
 function discoverNext(){
