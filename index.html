@@ -115,6 +115,28 @@
   .brand-mark-sm svg{display:block;width:100%;height:100%;}
   .topbar-brand{display:flex;align-items:center;gap:9px;min-width:0;flex:0 0 auto;}
   .topbar-brand .brand{font-size:17px;white-space:nowrap;}
+  /* Animación infinita y suave del logo en el encabezado (topbar): un
+     "respiro" sutil de escala + brillo, para que se sienta vivo sin ser
+     llamativo ni distraer de la interfaz. Solo se aplica al logo del
+     header (dentro de .topbar-brand), no al del login ni al del footer. */
+  .topbar-brand .brand-mark-sm{
+    animation: headerLogoBreathe 3.4s ease-in-out infinite;
+    transform-origin:center;
+    will-change: transform, filter;
+  }
+  @keyframes headerLogoBreathe{
+    0%, 100%{
+      transform:scale(1);
+      filter:drop-shadow(0 0 6px var(--border-glow));
+    }
+    50%{
+      transform:scale(1.07);
+      filter:drop-shadow(0 0 13px var(--border-glow));
+    }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .topbar-brand .brand-mark-sm{ animation:none; }
+  }
   @media (max-width:480px){
     .topbar-brand{gap:6px;}
     .topbar-brand .brand{font-size:14px;}
