@@ -759,6 +759,12 @@
     display:flex;align-items:center;justify-content:center;font-size:12px;transition:.15s;
   }
   .admin-user-delete:hover{background:rgba(255,61,107,.12);border-color:rgba(255,61,107,.4);color:var(--accent-coral);}
+  .admin-gender-select{
+    flex:0 0 auto;background:var(--bg-void);border:1px solid rgba(255,255,255,.1);
+    border-radius:8px;padding:5px 6px;color:var(--text-cream);font-size:11px;
+    outline:none;cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .admin-gender-select option{background:var(--bg-panel);color:var(--text-cream);}
   .msg-delete-btn{
     background:rgba(0,0,0,.35);border:none;color:var(--text-muted);cursor:pointer;
     font-size:12px;border-radius:8px;padding:4px 6px;opacity:0;transition:opacity .15s, color .15s;
@@ -1507,14 +1513,6 @@
         <!-- EDIT MODE -->
         <div id="profile-edit-mode" class="hidden">
           <div class="field"><label>Biografie</label><textarea id="edit-bio" maxlength="220" rows="3" placeholder="Erzähl dem Platz etwas über dich..."></textarea></div>
-          <div class="field">
-            <label>Ich bin</label>
-            <select id="edit-gender">
-              <option value="male">Mann</option>
-              <option value="female">Frau</option>
-              <option value="other">Divers</option>
-            </select>
-          </div>
           <div class="field"><label>Telegram</label><input id="edit-telegram" placeholder="Benutzername oder t.me-Link"></div>
           <div class="field"><label>WhatsApp</label><input id="edit-whatsapp" placeholder="Nummer, z. B. 51999999999"></div>
           <div class="field"><label>Facebook</label><input id="edit-facebook" placeholder="Benutzername oder facebook.com-Link"></div>
@@ -2379,47 +2377,17 @@ async function showChat(){
   // vez que se entra a la app; el usuario la cierra (✕) para ir al lobby.
   openDiscoverView();
   // Cuentas creadas con Google (o cuentas antiguas de antes de que existiera
-  // este campo) no tienen género guardado todavía. Sin él no podemos
-  // mostrarle a la persona perfiles del género opuesto en "Descubrir", así
-  // que se lo pedimos con un pequeño modal (se puede posponer con "Später").
-  if(currentUser && !currentUser.gender){
+  // este campo) no tienen género guardado todavía. Solo el administrador
+  // puede asignar/cambiar género (desde el panel de admin), así que este
+  // modal automático es exclusivamente para su propia cuenta — a un
+  // usuario normal sin género no le sirve de nada verlo, ya que no puede
+  // guardarlo él mismo.
+  if(currentUser && currentUser.isAdmin && !currentUser.gender){
     openGenderModal();
   }
 }
 
 /* ---------------- GÉNERO (para filtrar "Descubrir" por género opuesto) ---------------- */
-// Cambio rápido de género directamente desde el chip del propio perfil
-// (sin tener que entrar al modo "Editar perfil"). Sirve para cualquier
-// cuenta, incluida la del administrador.
-async function quickSetGender(gender){
-  if(!currentUser) return;
-  const key = currentUser.username.toLowerCase();
-  let u = null;
-  try{
-    await sTransact('farol-users', (users) => {
-      users = users || {};
-      u = users[key] || currentUser;
-      u.gender = gender;
-      users[key] = u;
-      return users;
-    });
-  }catch(e){
-    console.error('Geschlecht konnte nicht gespeichert werden', e);
-    showToast('Konnte nicht gespeichert werden. Versuche es erneut.', 'error');
-    renderProfileView(currentUser); // revierte el select al valor real conocido
-    return;
-  }
-  usersCache[key] = u;
-  currentUser = u;
-  cacheUserLocally(currentUser);
-  renderProfileView(currentUser);
-  if(currentView === 'discover'){
-    await loadDiscoverList();
-    discoverIndex = 0;
-    renderDiscoverCard();
-  }
-  showToast('Geschlecht aktualisiert.', 'success');
-}
 function openGenderModal(){
   document.getElementById('gender-modal').classList.remove('hidden');
 }
@@ -3153,6 +3121,19 @@ async function openAdminPanel(){
       info.appendChild(email);
       row.appendChild(av);
       row.appendChild(info);
+      // Selector de género: SOLO el administrador tiene esta pantalla, así
+      // que este es el único lugar de toda la app donde se puede cambiar
+      // el género de una cuenta (la propia del admin incluida).
+      const genderSel = document.createElement('select');
+      genderSel.className = 'admin-gender-select';
+      genderSel.title = 'Geschlecht ändern';
+      genderSel.innerHTML = `
+        <option value="male"${u.gender==='male'?' selected':''}>♂ Mann</option>
+        <option value="female"${u.gender==='female'?' selected':''}>♀ Frau</option>
+        <option value="other"${(!u.gender||u.gender==='other')?' selected':''}>⚧ Divers</option>
+      `;
+      genderSel.onchange = () => adminSetUserGender(u.username, genderSel.value);
+      row.appendChild(genderSel);
       // El admin no puede borrarse a sí mismo desde este panel.
       if(u.username !== ADMIN_NAME){
         const delBtn = document.createElement('button');
@@ -3170,6 +3151,39 @@ async function openAdminPanel(){
 }
 function closeAdminPanel(){
   document.getElementById('admin-modal').classList.add('hidden');
+}
+
+// Cambia el género de cualquier cuenta desde el panel de administrador.
+// Es la ÚNICA vía para cambiar el género en toda la app: los usuarios
+// normales ya no pueden editarlo desde su propio perfil.
+async function adminSetUserGender(username, gender){
+  if(!currentUser || !currentUser.isAdmin) return;
+  const key = username.toLowerCase();
+  let newUsers;
+  try{
+    newUsers = await sTransact('farol-users', (users) => {
+      users = users || {};
+      const u = users[key] || (username === ADMIN_NAME ? buildAdminUser() : {username, color: colorFor(username), createdAt: Date.now()});
+      u.gender = gender;
+      users[key] = u;
+      return users;
+    });
+  }catch(e){
+    console.error('Geschlecht konnte nicht gespeichert werden', e);
+    showToast('Geschlecht konnte nicht gespeichert werden. Versuche es erneut.', 'error');
+    return;
+  }
+  usersCache = newUsers || usersCache;
+  // Si el admin se cambió el género a sí mismo, refrescamos su propia sesión.
+  if(currentUser.username.toLowerCase() === key){
+    currentUser = usersCache[key] || currentUser;
+    cacheUserLocally(currentUser);
+  }
+  // Si el perfil de esa persona está abierto en este momento, refrescamos su chip.
+  if(viewingProfile && viewingProfile.toLowerCase() === key){
+    renderProfileView(usersCache[key] || userLookup(username));
+  }
+  showToast('Geschlecht aktualisiert.', 'success');
 }
 
 /* ---------------- ADMIN: BENUTZER LÖSCHEN ---------------- */
@@ -3807,23 +3821,16 @@ function renderProfileView(u){
 
   const isOwn = currentUser && currentUser.username === u.username;
 
-  // Chip de género: en el propio perfil (incluido el admin) es un selector
-  // clickeable que guarda al instante, así cambiar de género no requiere
-  // entrar al modo "Editar perfil". En perfiles ajenos es solo informativo.
+  // Chip de género: solo informativo. El único lugar donde se puede
+  // cambiar el género de una cuenta es el panel de administrador — así lo
+  // pidió el usuario ("solo el administrador pueda cambiar el género").
   const genderChip = document.getElementById('profile-gender-chip');
   const genderLabels = {male:'♂ Mann', female:'♀ Frau', other:'⚧ Divers'};
   if(genderChip){
-    genderChip.classList.remove('hidden');
-    if(isOwn){
-      genderChip.innerHTML = `<select id="profile-gender-select" onchange="quickSetGender(this.value)" title="Geschlecht ändern">
-        <option value="male"${u.gender==='male'?' selected':''}>♂ Mann</option>
-        <option value="female"${u.gender==='female'?' selected':''}>♀ Frau</option>
-        <option value="other"${(!u.gender||u.gender==='other')?' selected':''}>⚧ Divers</option>
-      </select>`;
-      genderChip.className = 'profile-gender-chip profile-gender-chip-own gender-' + (u.gender || 'other');
-    }else if(u.gender && genderLabels[u.gender]){
+    if(u.gender && genderLabels[u.gender]){
       genderChip.textContent = genderLabels[u.gender];
       genderChip.className = 'profile-gender-chip gender-' + u.gender;
+      genderChip.classList.remove('hidden');
     }else{
       genderChip.textContent = '';
       genderChip.classList.add('hidden');
@@ -4155,7 +4162,6 @@ function toggleProfileEdit(){
   document.getElementById('profile-edit-mode').classList.toggle('hidden', !editHidden);
   if(editHidden){
     document.getElementById('edit-bio').value = currentUser.bio || '';
-    document.getElementById('edit-gender').value = currentUser.gender || 'other';
     const s = currentUser.socials || {};
     document.getElementById('edit-telegram').value = s.telegram || '';
     document.getElementById('edit-whatsapp').value = s.whatsapp || '';
@@ -4190,7 +4196,6 @@ async function saveProfile(){
 
   const key = currentUser.username.toLowerCase();
   const newBio = document.getElementById('edit-bio').value.trim().slice(0, 220);
-  const newGender = document.getElementById('edit-gender').value;
   let u = null;
   try{
     // Transacción atómica: evita que este guardado pise (o sea pisado por)
@@ -4199,7 +4204,6 @@ async function saveProfile(){
       users = users || {};
       u = users[key] || currentUser;
       u.bio = newBio;
-      u.gender = newGender;
       u.socials = rawSocials;
       users[key] = u;
       return users;
