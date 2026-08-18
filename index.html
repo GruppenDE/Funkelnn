@@ -4173,12 +4173,16 @@ async function paintDiscoverPhoto(username){
     }
   }
   // "Descubrir" es a pantalla completa y es justo donde más se nota una
-  // foto vieja, así que acá no confiamos ciegamente en que avatarCache ya
-  // tenga el valor correcto (pudo haberse llenado antes, en otra pantalla,
-  // con lo último que había en localStorage). Pintamos ESO de entrada nomás
-  // para que no tarde en aparecer algo, pero después SIEMPRE confirmamos
-  // contra Firestore para esta tarjeta puntual.
-  let known = (avatarCache[key] !== undefined) ? avatarCache[key] : (userLookup(username).avatar || getLocalAvatarCache(key));
+  // foto vieja o el parpadeo "vieja -> nueva". Antes, si en este navegador
+  // había quedado guardada en localStorage una foto ya desactualizada (de
+  // ANTES de que la otra persona subiera una nueva), la mostrábamos de
+  // entrada por velocidad y recién la corregíamos cuando volvía la
+  // respuesta de Firestore — de ahí el parpadeo "primero la vieja, después
+  // la nueva" que se sigue viendo. Acá priorizamos que NUNCA se vea una
+  // foto incorrecta: si ya la confirmamos en esta sesión (avatarCache) la
+  // mostramos directo; si no, mostramos el círculo con iniciales (nunca
+  // una foto vieja) hasta tener la respuesta real de Firestore.
+  let known = (avatarCache[key] !== undefined) ? avatarCache[key] : null;
   paint(known);
   if(discoverAvatarUnsub) discoverAvatarUnsub();
   discoverAvatarUnsub = subscribeAvatarRepaint(username, (url) => {
@@ -4191,7 +4195,14 @@ async function paintDiscoverPhoto(username){
     // esté suscrito a este usuario (incluida esta misma tarjeta si sigue
     // mostrándolo), no solo a esta función.
     notifyAvatarUpdated(username, val);
-  }catch(e){}
+  }catch(e){
+    // Sin conexión a Firestore: como último recurso, mejor mostrar lo
+    // último que sepamos (aunque pueda estar desactualizado) que dejar
+    // solo iniciales.
+    const fallback = getLocalAvatarCache(key);
+    const current = discoverList[discoverIndex];
+    if(fallback && current && current.username.toLowerCase() === key) paint(fallback);
+  }
 }
 
 function discoverToggleLike(){
