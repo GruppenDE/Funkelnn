@@ -2015,16 +2015,10 @@ async function ensureFirebaseAuth(){
 }
 
 async function init(){
-  // --- DIAGNÓSTICO TEMPORAL: quitar estos console.log una vez encontrado el bug ---
-  console.log('[init] arrancando...');
   await ensureFirebaseAuth();
-  console.log('[init] ensureFirebaseAuth listo. auth.currentUser =', auth.currentUser);
   renderRoomList();
   await refreshUsersCache();
   const session = await sGet('farol-session', false);
-  console.log('[init] farol-session leído de localStorage =', JSON.stringify(session));
-  console.log('[init] localStorage.farol-session (crudo) =', localStorage.getItem('farol-session'));
-  console.log('[init] localStorage.farol-user-cache (crudo) =', localStorage.getItem('farol-user-cache'));
   if(session){
     if(session === ADMIN_NAME){
       // No basta con que 'farol-session' diga que es el admin (eso se podría
@@ -2052,7 +2046,6 @@ async function init(){
     // cerramos la sesión de verdad si el servidor confirma que la cuenta
     // ya no existe.
     const cachedUser = getCachedUser(session);
-    console.log('[init] getCachedUser(', session, ') =', cachedUser);
     if(cachedUser){
       currentUser = cachedUser;
       usersCache[session.toLowerCase()] = cachedUser;
@@ -2071,13 +2064,11 @@ async function init(){
     let users = null;
     for(let attempt = 0; attempt < 3; attempt++){
       const res = await sGetSafe('farol-users', true);
-      console.log('[init] intento', attempt, 'sGetSafe(farol-users) ok=', res.ok);
       if(res.ok){ users = res.value || {}; break; }
       await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
     }
     if(users){
       const u = users[session.toLowerCase()];
-      console.log('[init] usuario encontrado en Firestore para', session, '=', u);
       if(u){
         currentUser = u;
         usersCache[session.toLowerCase()] = u;
@@ -2085,11 +2076,8 @@ async function init(){
         showChat();
         return;
       }
-    }else{
-      console.log('[init] no se pudo leer farol-users de Firestore tras 3 intentos');
     }
   }
-  console.log('[init] llegó al final sin restaurar sesión -> showAuth()');
   showAuth();
 }
 
@@ -2402,7 +2390,25 @@ async function signInWithGoogle(){
   const gUser = result.user;
   const name = gUser.displayName || (gUser.email ? gUser.email.split('@')[0] : 'Nutzer');
   const email = gUser.email || '';
-  const key = name.toLowerCase().replace(/\s+/g,'');
+  // IMPORTANTE: esta key debe ser SIEMPRE name.toLowerCase() (sin quitar
+  // espacios), porque en todo el resto de la app (farol-session, la
+  // verificación de sesión en segundo plano, el login manual, etc.) los
+  // usuarios se buscan con `algo.toLowerCase()` sin tocar los espacios.
+  // Antes esta línea hacía además `.replace(/\s+/g,'')`, lo que guardaba la
+  // cuenta de Google bajo una clave SIN espacios (p. ej. "bettymangum")
+  // mientras que farol-session guardaba el nombre CON espacios (p. ej.
+  // "Betty Mangum"). Como consecuencia, cada verificación en segundo plano
+  // (verifySessionInBackground, que se dispara en cada carga/refresh)
+  // buscaba "betty mangum" en Firestore, nunca la encontraba, concluía que
+  // la cuenta "ya no existe" y forzaba un logout — devolviendo a cualquier
+  // usuario de Google con espacios en su nombre al login en cada refresh.
+  const key = name.toLowerCase();
+
+  // Clave vieja (sin espacios) bajo la que quedaron guardadas las cuentas de
+  // Google creadas ANTES de este fix. La usamos solo para migrar esas
+  // cuentas existentes a la nueva clave (con espacios) la primera vez que
+  // vuelven a entrar, así no pierden su avatar, color ni historial.
+  const legacyKey = name.toLowerCase().replace(/\s+/g,'');
 
   let user = null;
   try{
@@ -2412,11 +2418,18 @@ async function signInWithGoogle(){
     await sTransact('farol-users', (users) => {
       users = users || {};
       if(!users[key]){
-        users[key] = {
-          username: name, email, passwordHash: null,
-          color: colorFor(name), createdAt: Date.now(),
-          provider: 'google', googleUid: gUser.uid, photoURL: gUser.photoURL || null
-        };
+        if(legacyKey !== key && users[legacyKey]){
+          // Cuenta creada antes del fix: la migramos a la nueva clave en
+          // vez de crear una cuenta duplicada desde cero.
+          users[key] = users[legacyKey];
+          delete users[legacyKey];
+        }else{
+          users[key] = {
+            username: name, email, passwordHash: null,
+            color: colorFor(name), createdAt: Date.now(),
+            provider: 'google', googleUid: gUser.uid, photoURL: gUser.photoURL || null
+          };
+        }
       }
       user = users[key];
       return users;
