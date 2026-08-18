@@ -1871,6 +1871,10 @@ const ONLINE_TTL = 30000;
 let currentUser = null;
 let currentRoom = 'general';
 let dmPartner = null; // username of the person we're DMing, or null when in a normal room / admin-spectating
+// Evita mostrar el mismo aviso de "conexión bloqueada" una y otra vez si el
+// bloqueo persiste durante toda la sesión (los listeners de Firestore
+// pueden volver a fallar varias veces seguidas).
+let connectionWarningShown = false;
 let currentView = 'lobby'; // 'lobby' | 'chat'
 let pollTimer = null;
 let heartbeatTimer = null;
@@ -3790,7 +3794,17 @@ async function ensureDmIndexEntry(userA, userB){
     });
     dmIndexCache = idx || dmIndexCache;
     refreshDmBadge();
-  }catch(e){ console.error('No se pudo registrar el chat privado', e); }
+  }catch(e){
+    console.error('No se pudo registrar el chat privado', e);
+    // Sin esto, si la conexión a Firestore está bloqueada (bloqueador de
+    // anuncios, Brave Shields, firewall) el chat privado "no hacía nada"
+    // desde el punto de vista del usuario: no había ningún aviso de que
+    // el registro del chat había fallado.
+    if(!connectionWarningShown){
+      connectionWarningShown = true;
+      showToast('Verbindung zum Chat-Server blockiert. Bitte deaktiviere Werbeblocker/Brave Shields für diese Seite und lade neu.', 'error');
+    }
+  }
   return id;
 }
 
@@ -3891,7 +3905,20 @@ function attachActiveRoomListener(room){
       const lastTs = arr.length ? arr[arr.length - 1].ts : Date.now();
       markDmRead(room, lastTs);
     }
-  }, err => console.error('room listener failed', err));
+  }, err => {
+    console.error('room listener failed', err);
+    // Este error casi siempre significa que algo del propio navegador
+    // (Brave Shields, un bloqueador de anuncios como uBlock, o un firewall)
+    // está bloqueando las conexiones a firestore.googleapis.com — sin esa
+    // conexión ningún mensaje puede enviarse ni recibirse, y antes esto
+    // fallaba en silencio (el usuario solo veía que "no pasaba nada").
+    // Avisamos una sola vez por sesión para no inundar de toasts si el
+    // bloqueo persiste (el listener puede reintentar/fallar varias veces).
+    if(!connectionWarningShown){
+      connectionWarningShown = true;
+      showToast('Verbindung zum Chat-Server blockiert. Bitte deaktiviere Werbeblocker/Brave Shields für diese Seite und lade neu.', 'error');
+    }
+  });
 }
 function detachActiveRoomListener(){
   if(activeRoomUnsub){ activeRoomUnsub(); activeRoomUnsub = null; }
