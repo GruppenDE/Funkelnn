@@ -377,7 +377,7 @@
   .room-name{font-size:13.5px;font-weight:600;}
   .room-desc{font-size:11px;color:var(--text-muted);margin-top:1px;}
 
-  .chat-main{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--bg-void);min-width:0;}
+  .chat-main{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--bg-void);min-width:0;position:relative;}
   .messages{
     flex:1;overflow-y:auto;padding:22px 26px;display:flex;flex-direction:column;gap:2px;
     width:100%;
@@ -445,6 +445,37 @@
     transition:filter .15s, transform .15s, background .15s;
   }
   .attach-btn:hover{background:rgba(255,255,255,.15);filter:brightness(1.15);transform:translateY(-1px);}
+
+  /* ---------- FAB: volver al inicio ---------- */
+  .fab-home{
+    position:absolute;right:22px;bottom:96px;z-index:6;
+    width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--accent-violet),var(--accent-coral));
+    color:#fff;font-size:19px;
+    box-shadow:0 8px 22px -6px rgba(255,61,107,.55), 0 0 0 1px rgba(255,255,255,.1) inset;
+    animation:fabIntro .5s cubic-bezier(.34,1.56,.64,1) both, fabBreathe 3.2s ease-in-out .6s infinite;
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease, filter .2s ease;
+  }
+  .fab-home i{transition:transform .3s cubic-bezier(.34,1.56,.64,1);}
+  .fab-home:hover{
+    transform:translateY(-4px) scale(1.08);
+    filter:brightness(1.1);
+    box-shadow:0 12px 28px -6px rgba(255,61,107,.7), 0 0 0 1px rgba(255,255,255,.14) inset;
+  }
+  .fab-home:hover i{transform:translateX(-2px) scale(1.05);}
+  .fab-home:active{transform:translateY(-1px) scale(.94);}
+  @keyframes fabIntro{
+    0%{opacity:0;transform:scale(.4) translateY(14px);}
+    100%{opacity:1;transform:scale(1) translateY(0);}
+  }
+  @keyframes fabBreathe{
+    0%,100%{box-shadow:0 8px 22px -6px rgba(255,61,107,.55), 0 0 0 1px rgba(255,255,255,.1) inset;}
+    50%{box-shadow:0 8px 26px -4px rgba(255,61,107,.85), 0 0 0 1px rgba(255,255,255,.16) inset;}
+  }
+  @media (max-width:480px){
+    .fab-home{right:14px;bottom:88px;width:44px;height:44px;font-size:17px;}
+  }
 
   .bubble-media{max-width:260px;border-radius:14px;overflow:hidden;display:block;margin-bottom:6px;cursor:pointer;}
   .bubble-media img,.bubble-media video{width:100%;display:block;max-height:320px;object-fit:cover;}
@@ -1201,6 +1232,9 @@
 
       <div class="chat-main">
         <div class="messages" id="messages"></div>
+        <button type="button" class="fab-home" onclick="backToLobby()" title="Zurück zur Startseite" aria-label="Zurück zur Startseite">
+          <i class="fa-solid fa-house"></i>
+        </button>
         <form class="composer" onsubmit="handleSend(event)">
           <div class="composer-preview" id="composer-preview" style="display:none;">
             <div class="composer-preview-thumb" id="composer-preview-thumb"></div>
