@@ -351,6 +351,30 @@
   .avatar.clickable{cursor:pointer;}
   .me{display:flex;align-items:center;gap:8px;cursor:pointer;}
   .me-name{font-size:13px;font-weight:600;}
+  /* Insignia de "alguien comentó tu foto" sobre el avatar propio del header
+     (lobby y sala de chat). Un pequeño círculo pulsante en la esquina, al
+     estilo de una notificación de red social; toca para ver quién comentó. */
+  .me-avatar-wrap{position:relative;flex:0 0 auto;}
+  .photo-notif-badge{
+    position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 3px;
+    border-radius:9px;background:var(--accent-coral);color:#fff;
+    font-size:9.5px;font-weight:700;line-height:16px;text-align:center;
+    box-shadow:0 0 0 2px var(--bg-panel);cursor:pointer;
+    animation:photoNotifPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes photoNotifPulse{
+    0%,100%{box-shadow:0 0 0 2px var(--bg-panel), 0 0 0 0 rgba(255,61,107,.6);}
+    50%{box-shadow:0 0 0 2px var(--bg-panel), 0 0 0 4px rgba(255,61,107,0);}
+  }
+  @media (prefers-reduced-motion:reduce){ .photo-notif-badge{animation:none;} }
+  .photo-notif-row{display:flex;align-items:flex-start;gap:10px;padding:9px 8px;border-radius:10px;cursor:pointer;}
+  .photo-notif-row:hover{background:var(--bg-card);}
+  .photo-notif-row.unread{background:rgba(255,46,156,.07);}
+  .photo-notif-text{font-size:12.5px;color:var(--text-cream);line-height:1.4;min-width:0;flex:1;}
+  .photo-notif-text b{color:var(--accent-mint);}
+  .photo-notif-preview{color:var(--text-muted);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+  .photo-notif-time{font-size:10.5px;color:var(--text-muted);white-space:nowrap;flex:0 0 auto;margin-top:1px;}
+  .photo-notif-empty{color:var(--text-muted);font-size:12.5px;text-align:center;padding:20px 0;}
   .btn-icon{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:17px;padding:6px;border-radius:8px;}
   .btn-icon:hover{background:var(--bg-card);color:var(--text-cream);}
   .online-toggle{
@@ -1414,7 +1438,10 @@
           </a>
           <button class="btn-icon admin-btn hidden" id="lobby-admin-btn" onclick="openAdminPanel()" title="Admin-Panel" aria-label="Admin-Panel">👑</button>
           <div class="me" onclick="openProfile(currentUser.username)">
-            <div class="avatar avatar-sm" id="lobby-me-avatar"></div>
+            <div class="me-avatar-wrap">
+              <div class="avatar avatar-sm" id="lobby-me-avatar"></div>
+              <span class="photo-notif-badge hidden" id="lobby-photo-notif-badge" onclick="event.stopPropagation(); openPhotoNotifications();" title="Foto-Kommentare">0</span>
+            </div>
             <div class="me-name" id="lobby-me-name"></div>
           </div>
         </div>
@@ -1517,7 +1544,10 @@
           <span class="online-toggle-badge" id="online-toggle-badge">0</span>
         </button>
         <div class="me" onclick="openProfile(currentUser.username)">
-          <div class="avatar avatar-sm" id="me-avatar"></div>
+          <div class="me-avatar-wrap">
+            <div class="avatar avatar-sm" id="me-avatar"></div>
+            <span class="photo-notif-badge hidden" id="me-photo-notif-badge" onclick="event.stopPropagation(); openPhotoNotifications();" title="Foto-Kommentare">0</span>
+          </div>
           <div class="me-name" id="me-name"></div>
         </div>
         <button class="hamburger" onclick="toggleRoomsSidebar()" title="Räume" aria-label="Räume">☰</button>
@@ -1663,6 +1693,21 @@
     </div>
   </div>
 
+  <!-- ===================== FOTO-KOMMENTAR-BENACHRICHTIGUNGEN =====================
+       Se abre al tocar la campanita/insignia sobre el avatar propio del header
+       (lobby y sala de chat). Lista quién comentó tus fotos, y al tocar un
+       elemento te lleva directo a esa foto en tu propio perfil. -->
+  <div id="photo-notif-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closePhotoNotifications()">
+    <div class="dm-list-panel">
+      <button class="btn-icon profile-close" onclick="closePhotoNotifications()">✕</button>
+      <div class="dm-list-head">
+        <div class="dm-list-title">💬 Foto-Kommentare</div>
+      </div>
+      <div class="dm-list-sub" id="photo-notif-sub" style="margin-bottom:14px;">Wer hat deine Fotos kommentiert</div>
+      <div class="dm-list-items" id="photo-notif-items"></div>
+    </div>
+  </div>
+
   <!-- ===================== DELETE USER CONFIRM ===================== -->
   <div id="delete-user-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeDeleteUserModal()">
     <div class="modal">
@@ -1674,6 +1719,7 @@
       </div>
     </div>
   </div>
+
 
 
   <div id="banner-position-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeBannerPositionModal()">
@@ -1829,6 +1875,17 @@ let activeRoomUnsub = null; // realtime listener for whatever room is currently 
 // DOM si sigue siendo la más reciente en curso; si ya la superó una
 // llamada posterior, descarta su resultado en silencio.
 let dmBadgeRequestId = 0;
+
+// Realtime state para las notificaciones de "comentaron tu foto": una
+// caché en vivo de mi propia galería, la marca de tiempo de "último leído",
+// y sus handles de listener — mismo patrón que dmIndexCache/myDmReadsCache
+// de arriba.
+let myGalleryCache = [];
+let myPhotoCommentReadTs = 0;
+let myGalleryUnsub = null;
+let photoCommentReadsUnsub = null;
+let photoNotifBadgeRequestId = 0;
+
 /* ---------------- STORAGE HELPERS (Firebase Firestore) ---------------- */
 // This app only ever calls these with shared=false for 'farol-session',
 // a purely local "who's logged in on this device/browser" value — that one
@@ -1990,6 +2047,11 @@ function galleryKey(username){ return 'farol-gallery-'+username.toLowerCase(); }
 // liviano sin importar cuántas fotos tenga: solo guarda una miniatura chica
 // por foto, y la imagen grande se carga recién cuando se abre el lightbox.
 function galleryImgKey(photoId){ return 'farol-gallery-img-'+photoId; }
+// Marca de tiempo (guardada en Firestore, así se sincroniza entre
+// dispositivos) hasta la cual el dueño de la galería ya vio los comentarios
+// que le dejaron en sus fotos. Se usa para calcular la insignia de
+// notificación sobre el avatar propio del header.
+function photoCommentReadsKey(username){ return 'farol-photocomment-read-'+username.toLowerCase(); }
 
 // El avatar y el banner de cada usuario viven en su PROPIO documento de
 // Firestore (uno por usuario), no dentro del documento compartido
@@ -2086,6 +2148,30 @@ function paintDmBadgeFromLocalCache(username){
   const cached = getLocalDmBadgeCount(username);
   if(cached === null) return;
   ['dm-list-badge-lobby','dm-list-badge-chat'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = cached > 99 ? '99+' : String(cached);
+    el.classList.toggle('hidden', cached === 0);
+  });
+}
+
+// Mismo patrón que arriba, pero para "cuántos comentarios nuevos me dejaron
+// en mis fotos" — la insignia sobre el avatar propio del header.
+function photoNotifBadgeLocalCacheKey(username){ return 'farol-photocomment-badge-local-'+username.toLowerCase(); }
+function getLocalPhotoNotifBadgeCount(username){
+  try{
+    const raw = localStorage.getItem(photoNotifBadgeLocalCacheKey(username));
+    return raw === null ? null : parseInt(raw, 10) || 0;
+  }catch(e){ return null; }
+}
+function setLocalPhotoNotifBadgeCount(username, count){
+  try{ localStorage.setItem(photoNotifBadgeLocalCacheKey(username), String(count)); }
+  catch(e){ /* no crítico */ }
+}
+function paintPhotoNotifBadgeFromLocalCache(username){
+  const cached = getLocalPhotoNotifBadgeCount(username);
+  if(cached === null) return;
+  ['lobby-photo-notif-badge','me-photo-notif-badge'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.textContent = cached > 99 ? '99+' : String(cached);
@@ -2533,9 +2619,11 @@ async function showChat(){
   document.getElementById('chat-admin-btn').classList.toggle('hidden', !currentUser.isAdmin);
   refreshMyAvatarUI();
   paintDmBadgeFromLocalCache(currentUser.username);
+  paintPhotoNotifBadgeFromLocalCache(currentUser.username);
   currentView = 'lobby';
   startHeartbeat();
   startDmRealtime();
+  startPhotoNotifRealtime();
   await renderLobby();
   startPolling();
   // Pantalla de descubrimiento a pantalla completa (foto + like + chat
@@ -2943,6 +3031,8 @@ async function logout(){
   currentUser = null;
   dmIndexCache = {};
   myDmReadsCache = {};
+  myGalleryCache = [];
+  myPhotoCommentReadTs = 0;
   currentView = 'lobby';
   document.getElementById('view-lobby').classList.add('hidden');
   document.getElementById('view-chat').classList.add('hidden');
@@ -3462,6 +3552,7 @@ async function poll(){
   if(!currentUser) return;
   await refreshUsersCache();
   refreshDmBadge();
+  refreshPhotoCommentBadge();
   if(currentView === 'lobby'){
     await renderLobby();
     return;
@@ -3714,6 +3805,7 @@ function stopDmIndexListeners(){
 }
 function stopAllRealtime(){
   stopDmIndexListeners();
+  stopPhotoNotifRealtime();
   detachActiveRoomListener();
 }
 
@@ -3799,6 +3891,159 @@ async function refreshDmBadge(){
       el.classList.toggle('hidden', unreadChats === 0);
     });
   }catch(e){ /* badge is a nice-to-have, never block on it */ }
+}
+
+/* ================= NOTIFICACIONES: COMENTARIOS EN MIS FOTOS =================
+   Mismo patrón que las notificaciones de chats privados de arriba: una
+   caché en vivo de mi propia galería + mi "último leído", listeners de
+   Firestore para que la insignia reaccione al instante (sin esperar al
+   poll de 3s) y una insignia con caché local para que pinte de una al
+   cargar la página. */
+async function getMyPhotoCommentReadTs(){
+  if(!currentUser) return 0;
+  try{ return (await sGet(photoCommentReadsKey(currentUser.username), true)) || 0; }
+  catch(e){ return 0; }
+}
+
+// Junta, de TODAS mis fotos, los comentarios que llegaron después de mi
+// última visita y que no escribí yo mismo (para no notificarme de mis
+// propios comentarios). Devuelve la lista más reciente primero.
+function collectUnreadPhotoComments(){
+  if(!currentUser) return [];
+  const photos = Array.isArray(myGalleryCache) ? myGalleryCache : [];
+  const meLower = currentUser.username.toLowerCase();
+  const lastRead = myPhotoCommentReadTs || 0;
+  const items = [];
+  photos.forEach(p=>{
+    (p.comments || []).forEach(c=>{
+      if(c.user && c.user.toLowerCase() !== meLower){
+        items.push({photoId: p.id, thumb: p.thumb, user: c.user, text: c.text, ts: c.ts, unread: c.ts > lastRead});
+      }
+    });
+  });
+  items.sort((a,b)=> b.ts - a.ts);
+  return items;
+}
+
+// Insignia sobre el avatar propio del header: cuántos comentarios nuevos
+// (de otras personas) tienen mis fotos desde la última vez que revisé.
+async function refreshPhotoCommentBadge(){
+  if(!currentUser) return;
+  const requestId = ++photoNotifBadgeRequestId;
+  try{
+    if(!myGalleryCache || myGalleryCache.length === 0){
+      myGalleryCache = await sGet(galleryKey(currentUser.username), true) || [];
+    }
+    if(!myPhotoCommentReadTs){
+      myPhotoCommentReadTs = await getMyPhotoCommentReadTs();
+    }
+    if(requestId !== photoNotifBadgeRequestId) return;
+    const unreadCount = collectUnreadPhotoComments().filter(c=>c.unread).length;
+    setLocalPhotoNotifBadgeCount(currentUser.username, unreadCount);
+    ['lobby-photo-notif-badge','me-photo-notif-badge'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+      el.classList.toggle('hidden', unreadCount === 0);
+    });
+  }catch(e){ /* insignia: nunca debe bloquear nada si falla */ }
+}
+
+// Mantiene mi galería y mi "último leído" en vivo mientras esté conectado,
+// así la insignia aparece al instante cuando alguien comenta — sin esperar
+// al siguiente ciclo de poll (cada 3s).
+function startPhotoNotifRealtime(){
+  if(!currentUser) return;
+  stopPhotoNotifRealtime();
+  myGalleryUnsub = kvDocRef(galleryKey(currentUser.username)).onSnapshot(snap=>{
+    try{ myGalleryCache = snap.exists ? (JSON.parse(snap.data().value || '[]') || []) : []; }
+    catch(e){ myGalleryCache = []; }
+    refreshPhotoCommentBadge();
+    const modal = document.getElementById('photo-notif-modal');
+    if(modal && !modal.classList.contains('hidden')) renderPhotoNotifications();
+  }, err => console.error('gallery listener failed', err));
+
+  photoCommentReadsUnsub = kvDocRef(photoCommentReadsKey(currentUser.username)).onSnapshot(snap=>{
+    try{ myPhotoCommentReadTs = snap.exists ? (JSON.parse(snap.data().value || '0') || 0) : 0; }
+    catch(e){ myPhotoCommentReadTs = 0; }
+    refreshPhotoCommentBadge();
+  }, err => console.error('photo comment reads listener failed', err));
+}
+function stopPhotoNotifRealtime(){
+  if(myGalleryUnsub){ myGalleryUnsub(); myGalleryUnsub = null; }
+  if(photoCommentReadsUnsub){ photoCommentReadsUnsub(); photoCommentReadsUnsub = null; }
+}
+
+// Marca todos los comentarios como vistos (se llama al abrir el panel de
+// notificaciones). Actualiza el estado local al instante para que la
+// insignia desaparezca sin demora, y persiste en segundo plano.
+async function markPhotoCommentsRead(){
+  if(!currentUser) return;
+  const ts = Date.now();
+  myPhotoCommentReadTs = ts;
+  refreshPhotoCommentBadge();
+  try{ await sSet(photoCommentReadsKey(currentUser.username), ts, true); }
+  catch(e){ console.error('No se pudo marcar los comentarios como leídos', e); }
+}
+
+// Formatea "hace cuánto" de forma breve (m/h/d), igual de simple que el
+// resto de marcas de tiempo relativas de la app.
+function timeAgoShort(ts){
+  const diff = Math.max(0, Date.now() - ts);
+  const mins = Math.floor(diff/60000);
+  if(mins < 1) return 'jetzt';
+  if(mins < 60) return mins+'m';
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24) return hrs+'h';
+  return Math.floor(hrs/24)+'d';
+}
+
+function renderPhotoNotifications(){
+  const list = document.getElementById('photo-notif-items');
+  if(!list) return;
+  const items = collectUnreadPhotoComments().slice(0, 40);
+  if(items.length === 0){
+    list.innerHTML = '<div class="photo-notif-empty">Noch keine Kommentare zu deinen Fotos.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  items.forEach(it=>{
+    const row = document.createElement('div');
+    row.className = 'photo-notif-row' + (it.unread ? ' unread' : '');
+    row.onclick = () => openPhotoNotificationItem(it.photoId);
+    const av = buildAvatarEl(it.user, 'avatar-sm');
+    const info = document.createElement('div');
+    info.className = 'photo-notif-text';
+    info.innerHTML = `<b>${it.user}</b> hat dein Foto kommentiert<span class="photo-notif-preview"></span>`;
+    info.querySelector('.photo-notif-preview').textContent = it.text || '';
+    const time = document.createElement('div');
+    time.className = 'photo-notif-time';
+    time.textContent = timeAgoShort(it.ts);
+    row.appendChild(av);
+    row.appendChild(info);
+    row.appendChild(time);
+    list.appendChild(row);
+  });
+}
+
+// Abre el panel: se marcan como leídos de una vez (así la insignia se
+// limpia apenas la persona mira quién comentó, igual que cualquier bandeja
+// de notificaciones).
+async function openPhotoNotifications(){
+  if(!currentUser) return;
+  renderPhotoNotifications();
+  document.getElementById('photo-notif-modal').classList.remove('hidden');
+  markPhotoCommentsRead();
+}
+function closePhotoNotifications(){
+  document.getElementById('photo-notif-modal').classList.add('hidden');
+}
+// Tocar una notificación puntual lleva directo a esa foto en mi propio
+// perfil (con su lightbox de comentarios ya abierto).
+async function openPhotoNotificationItem(photoId){
+  closePhotoNotifications();
+  await openProfile(currentUser.username);
+  if(photoId) openLightbox(photoId);
 }
 
 // Exact unread message count for one conversation (used in the list, where
