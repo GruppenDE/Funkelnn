@@ -4187,6 +4187,16 @@ async function paintDiscoverPhoto(username){
   // mostramos directo; si no, mostramos el círculo con iniciales (nunca
   // una foto vieja) hasta tener la respuesta real de Firestore.
   let known = (avatarCache[key] !== undefined) ? avatarCache[key] : null;
+  // Si esta sesión todavía no confirmó el avatar de esta persona (nadie lo
+  // pidió antes), probamos primero con lo último que quedó guardado en
+  // localStorage de una sesión anterior — así la foto aparece de una, en
+  // vez de mostrar el círculo de color con iniciales (el "flash amarillo")
+  // mientras se espera la respuesta de Firestore. Mismo patrón que ya usa
+  // applyAvatarStyle para el resto de los avatares de la app.
+  if(known === null && avatarCache[key] === undefined){
+    const cached = getLocalAvatarCache(key);
+    if(cached) known = cached;
+  }
   paint(known);
   if(discoverAvatarUnsub) discoverAvatarUnsub();
   discoverAvatarUnsub = subscribeAvatarRepaint(username, (url) => {
