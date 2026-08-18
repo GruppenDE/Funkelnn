@@ -1928,6 +1928,30 @@ function resizeImageFile(file, maxW, maxH, quality){
   });
 }
 
+// Caché local (localStorage) del usuario NO-admin actualmente logueado.
+// Guardamos el objeto completo (no solo el nombre) para poder restaurar la
+// sesión al instante en el próximo refresh sin depender de que Firestore
+// responda a tiempo. Si Firestore falla, tarda, o el usuario refresca antes
+// de que la sesión anónima nueva termine de propagarse, esto evita que la
+// persona sea devuelta al login solo por un hipo de red pasajero.
+const USER_CACHE_KEY = 'farol-user-cache';
+function cacheUserLocally(user){
+  try{ localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user)); }
+  catch(e){ console.warn('No se pudo cachear el usuario localmente', e); }
+}
+function getCachedUser(expectedUsername){
+  try{
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    if(!raw) return null;
+    const user = JSON.parse(raw);
+    if(!user || !user.username || user.username.toLowerCase() !== expectedUsername.toLowerCase()) return null;
+    return user;
+  }catch(e){ return null; }
+}
+function clearCachedUser(){
+  try{ localStorage.removeItem(USER_CACHE_KEY); }catch(e){}
+}
+
 /* ---------------- INIT ---------------- */
 window.addEventListener('DOMContentLoaded', init);
 
@@ -1984,11 +2008,29 @@ async function init(){
       showAuth();
       return;
     }
-    // Reintenta unas veces: justo después de crear una sesión anónima nueva,
-    // Firestore puede rechazar la primera lectura con un permission-denied
-    // pasajero mientras esa sesión se propaga. Sin reintento, ese error se
-    // confunde con "el usuario no existe" y manda a la persona al login
-    // aunque su sesión en localStorage siga siendo válida.
+    // Si tenemos una copia local de este mismo usuario (guardada en su
+    // último login/registro exitoso), la usamos de inmediato para entrar al
+    // chat sin esperar a Firestore. Así un refresh nunca devuelve a la
+    // persona al login solo porque la red o la sesión anónima nueva tardan
+    // en propagarse; verificamos con el servidor en segundo plano y solo
+    // cerramos la sesión de verdad si el servidor confirma que la cuenta
+    // ya no existe.
+    const cachedUser = getCachedUser(session);
+    if(cachedUser){
+      currentUser = cachedUser;
+      usersCache[session.toLowerCase()] = cachedUser;
+      showChat();
+      verifySessionInBackground(session);
+      return;
+    }
+
+    // Sin copia local (primera vez en este dispositivo, o caché borrada):
+    // reintenta unas veces contra Firestore. Justo después de crear una
+    // sesión anónima nueva, Firestore puede rechazar la primera lectura con
+    // un permission-denied pasajero mientras esa sesión se propaga. Sin
+    // reintento, ese error se confunde con "el usuario no existe" y manda a
+    // la persona al login aunque su sesión en localStorage siga siendo
+    // válida.
     let users = null;
     for(let attempt = 0; attempt < 3; attempt++){
       const res = await sGetSafe('farol-users', true);
@@ -1997,10 +2039,46 @@ async function init(){
     }
     if(users){
       const u = users[session.toLowerCase()];
-      if(u){ currentUser = u; usersCache[session.toLowerCase()] = u; showChat(); return; }
+      if(u){
+        currentUser = u;
+        usersCache[session.toLowerCase()] = u;
+        cacheUserLocally(u);
+        showChat();
+        return;
+      }
     }
   }
   showAuth();
+}
+
+// Confirma en segundo plano (sin bloquear la UI) que la sesión restaurada
+// desde la caché local sigue existiendo en el servidor, y refresca los
+// datos del usuario (avatar, color, etc.) si cambiaron. Solo desloguea de
+// verdad cuando el servidor responde y confirma explícitamente que la
+// cuenta ya no está — un fallo de lectura (offline, permission-denied
+// pasajero, etc.) NUNCA fuerza un logout.
+async function verifySessionInBackground(session){
+  let users = null;
+  for(let attempt = 0; attempt < 3; attempt++){
+    const res = await sGetSafe('farol-users', true);
+    if(res.ok){ users = res.value || {}; break; }
+    await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+  }
+  if(!users) return; // no se pudo confirmar nada: seguimos con la sesión cacheada tal cual
+  const u = users[session.toLowerCase()];
+  if(u){
+    currentUser = u;
+    usersCache[session.toLowerCase()] = u;
+    cacheUserLocally(u);
+    // Refresca en pantalla cualquier dato que pudo haber cambiado (nombre,
+    // avatar, rol) sin re-renderizar toda la vista.
+    if(document.getElementById('me-name')) document.getElementById('me-name').textContent = currentUser.username;
+    if(document.getElementById('lobby-me-name')) document.getElementById('lobby-me-name').textContent = currentUser.username;
+    refreshMyAvatarUI();
+  }else{
+    // El servidor confirmó, de verdad, que la cuenta ya no existe.
+    await logout();
+  }
 }
 
 function buildAdminUser(){
@@ -2197,6 +2275,7 @@ async function handleRegister(e){
   await sSet('farol-users', users, true);
   currentUser = users[key];
   usersCache[key] = currentUser;
+  cacheUserLocally(currentUser);
   await sSet('farol-session', username, false);
   showChat();
 }
@@ -2230,6 +2309,7 @@ async function handleLogin(e){
   }
   currentUser = u;
   usersCache[username.toLowerCase()] = u;
+  cacheUserLocally(currentUser);
   await sSet('farol-session', u.username, false);
   showChat();
 }
@@ -2267,6 +2347,7 @@ async function signInWithGoogle(){
   }
   currentUser = users[key];
   usersCache[key] = currentUser;
+  cacheUserLocally(currentUser);
   await sSet('farol-session', currentUser.username, false);
   showChat();
 }
@@ -2279,6 +2360,7 @@ async function logout(){
   delete online[currentUser.username];
   await sSet('farol-online', online, true);
   await sSet('farol-session', '', false);
+  clearCachedUser();
   if(currentUser.isAdmin || currentUser.provider === 'google'){
     try{ await auth.signOut(); }catch(e){ console.warn('Firebase Auth-Sitzung konnte nicht beendet werden', e); }
   }
