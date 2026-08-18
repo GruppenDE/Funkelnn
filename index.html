@@ -591,6 +591,14 @@
   .profile-likes-chip.liked{border-color:rgba(255,61,107,.5);background:rgba(255,61,107,.1);}
   .profile-likes-chip.liked i{color:var(--accent-coral);}
   .profile-likes-chip.is-own{cursor:default;}
+  .profile-gender-chip{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:11.5px;font-weight:600;color:var(--text-muted);
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+    border-radius:999px;padding:4px 10px;width:fit-content;
+  }
+  .profile-gender-chip.gender-male{color:#7fb8ff;border-color:rgba(127,184,255,.35);background:rgba(127,184,255,.1);}
+  .profile-gender-chip.gender-female{color:#ff8fc4;border-color:rgba(255,143,196,.35);background:rgba(255,143,196,.1);}
   .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .profile-handle{font-size:12.5px;color:var(--text-muted);}
   .profile-head-actions{display:flex;flex-wrap:wrap;gap:8px;}
@@ -1464,6 +1472,7 @@
           <div class="profile-head-info">
             <div class="profile-name" id="profile-name"></div>
             <div class="profile-handle" id="profile-handle"></div>
+            <span class="profile-gender-chip hidden" id="profile-gender-chip"></span>
             <button type="button" class="profile-likes-chip" id="profile-likes-chip" onclick="toggleProfileLike(viewingProfile)" title="Like geben/entfernen">
               <i class="fa-solid fa-heart"></i> <span id="profile-likes-count">0</span>
             </button>
@@ -3757,6 +3766,21 @@ function renderProfileView(u){
     : u.username;
   document.getElementById('profile-handle').textContent = '@' + u.username.toLowerCase();
   document.getElementById('profile-bio').textContent = u.bio || 'Es wurde noch keine Biografie geschrieben.';
+
+  // Chip visible del género: sirve para confirmar de un vistazo si quedó
+  // guardado (útil para revisar cuentas de prueba, como pidió el usuario).
+  const genderChip = document.getElementById('profile-gender-chip');
+  const genderLabels = {male:'♂ Mann', female:'♀ Frau', other:'⚧ Divers'};
+  if(genderChip){
+    if(u.gender && genderLabels[u.gender]){
+      genderChip.textContent = genderLabels[u.gender];
+      genderChip.className = 'profile-gender-chip gender-' + u.gender;
+      genderChip.classList.remove('hidden');
+    }else{
+      genderChip.textContent = '';
+      genderChip.classList.add('hidden');
+    }
+  }
 
   const banner = document.getElementById('profile-banner');
   const bKey = u.username.toLowerCase();
