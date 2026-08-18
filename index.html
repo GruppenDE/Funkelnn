@@ -577,6 +577,8 @@
   .social-chip.ic-facebook:hover{background:#1877F2;}
   .social-chip.ic-instagram:hover{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);}
   .social-chip.ic-twitter:hover{background:#000;}
+  .social-chip.ic-tiktok:hover{background:#000;}
+  .social-chip.ic-snapchat:hover{background:#FFFC00;}
   .social-empty{font-size:12.5px;color:var(--text-muted);}
 
   /* ---------- TOASTS ---------- */
@@ -1317,11 +1319,13 @@
         <!-- EDIT MODE -->
         <div id="profile-edit-mode" class="hidden">
           <div class="field"><label>Biografie</label><textarea id="edit-bio" maxlength="220" rows="3" placeholder="Erzähl dem Platz etwas über dich..."></textarea></div>
-          <div class="field"><label>Telegram</label><input id="edit-telegram" placeholder="Benutzername oder Link"></div>
+          <div class="field"><label>Telegram</label><input id="edit-telegram" placeholder="Benutzername oder t.me-Link"></div>
           <div class="field"><label>WhatsApp</label><input id="edit-whatsapp" placeholder="Nummer, z. B. 51999999999"></div>
-          <div class="field"><label>Facebook</label><input id="edit-facebook" placeholder="Benutzername oder Link"></div>
-          <div class="field"><label>Instagram</label><input id="edit-instagram" placeholder="Benutzername oder Link"></div>
-          <div class="field"><label>Twitter / X</label><input id="edit-twitter" placeholder="Benutzername oder Link"></div>
+          <div class="field"><label>Facebook</label><input id="edit-facebook" placeholder="Benutzername oder facebook.com-Link"></div>
+          <div class="field"><label>Instagram</label><input id="edit-instagram" placeholder="Benutzername oder instagram.com-Link"></div>
+          <div class="field"><label>Twitter / X</label><input id="edit-twitter" placeholder="Benutzername oder x.com-Link"></div>
+          <div class="field"><label>TikTok</label><input id="edit-tiktok" placeholder="Benutzername oder tiktok.com-Link"></div>
+          <div class="field"><label>Snapchat</label><input id="edit-snapchat" placeholder="Benutzername oder snapchat.com-Link"></div>
           <div class="modal-actions">
             <button class="btn-ghost" onclick="toggleProfileEdit()">Abbrechen</button>
             <button class="btn-primary" onclick="saveProfile()">Änderungen speichern</button>
@@ -2781,6 +2785,21 @@ const SOCIAL_ICONS = {
   facebook: '<svg viewBox="0 0 320 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"/></svg>',
   instagram: '<svg viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"/></svg>',
   twitter: '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z"/></svg>',
+  tiktok: '<svg viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M448,209.91a210.06,210.06,0,0,1-122.77-39.25V349.38A162.55,162.55,0,1,1,185,188.31V278.2a74.62,74.62,0,1,0,52.23,71.18V0l88,0a121.18,121.18,0,0,0,1.86,22.17h0A122.18,122.18,0,0,0,381,102.39a121.43,121.43,0,0,0,67,20.14Z"/></svg>',
+  snapchat: '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M15.943 11.526c-.111-.303-.323-.465-.564-.599a1 1 0 0 0-.123-.064l-.219-.111c-.752-.399-1.339-.902-1.746-1.498a3.4 3.4 0 0 1-.3-.531c-.034-.1-.032-.156-.008-.207a.3.3 0 0 1 .097-.1c.129-.086.262-.173.352-.231.162-.104.289-.187.371-.245.309-.216.525-.446.66-.702a1.4 1.4 0 0 0 .069-1.16c-.205-.538-.713-.872-1.329-.872a1.8 1.8 0 0 0-.487.065c.006-.368-.002-.757-.035-1.139-.116-1.344-.587-2.048-1.077-2.61a4.3 4.3 0 0 0-1.095-.881C9.764.216 8.92 0 7.999 0s-1.76.216-2.505.641c-.412.232-.782.53-1.097.883-.49.562-.96 1.267-1.077 2.61-.033.382-.04.772-.036 1.138a1.8 1.8 0 0 0-.487-.065c-.615 0-1.124.335-1.328.873a1.4 1.4 0 0 0 .067 1.161c.136.256.352.486.66.701.082.058.21.14.371.246l.339.221a.4.4 0 0 1 .109.11c.026.053.027.11-.012.217a3.4 3.4 0 0 1-.295.52c-.398.583-.968 1.077-1.696 1.472-.385.204-.786.34-.955.8-.128.348-.044.743.28 1.075q.18.189.409.31a4.4 4.4 0 0 0 1 .4.7.7 0 0 1 .202.09c.118.104.102.26.259.488q.12.178.296.3c.33.229.701.243 1.095.258.355.014.758.03 1.217.18.19.064.389.186.618.328.55.338 1.305.802 2.566.802 1.262 0 2.02-.466 2.576-.806.227-.14.424-.26.609-.321.46-.152.863-.168 1.218-.181.393-.015.764-.03 1.095-.258a1.14 1.14 0 0 0 .336-.368c.114-.192.11-.327.217-.42a.6.6 0 0 1 .19-.087 4.5 4.5 0 0 0 1.014-.404c.16-.087.306-.2.429-.336l.004-.005c.304-.325.38-.709.256-1.047m-1.121.602c-.684.378-1.139.337-1.493.565-.3.193-.122.61-.34.76-.269.186-1.061-.012-2.085.326-.845.279-1.384 1.082-2.903 1.082s-2.045-.801-2.904-1.084c-1.022-.338-1.816-.14-2.084-.325-.218-.15-.041-.568-.341-.761-.354-.228-.809-.187-1.492-.563-.436-.24-.189-.39-.044-.46 2.478-1.199 2.873-3.05 2.89-3.188.022-.166.045-.297-.138-.466-.177-.164-.962-.65-1.18-.802-.36-.252-.52-.503-.402-.812.082-.214.281-.295.49-.295a1 1 0 0 1 .197.022c.396.086.78.285 1.002.338q.04.01.082.011c.118 0 .16-.06.152-.195-.026-.433-.087-1.277-.019-2.066.094-1.084.444-1.622.859-2.097.2-.229 1.137-1.22 2.93-1.22 1.792 0 2.732.987 2.931 1.215.416.475.766 1.013.859 2.098.068.788.009 1.632-.019 2.065-.01.142.034.195.152.195a.4.4 0 0 0 .082-.01c.222-.054.607-.253 1.002-.338a1 1 0 0 1 .197-.023c.21 0 .409.082.49.295.117.309-.04.56-.401.812-.218.152-1.003.638-1.18.802-.184.169-.16.3-.139.466.018.14.413 1.991 2.89 3.189.147.073.394.222-.041.464"/></svg>',
+};
+// Dominios permitidos para cada red social: si el valor guardado es un
+// enlace completo, DEBE apuntar a uno de estos dominios (o subdominio).
+// Así se evita que, por ejemplo, se pegue un link de YouTube en el campo
+// de Telegram — cada campo solo admite un enlace de su propia red.
+const SOCIAL_DOMAINS = {
+  telegram:  ['t.me', 'telegram.me', 'telegram.org'],
+  whatsapp:  ['wa.me', 'api.whatsapp.com', 'chat.whatsapp.com', 'whatsapp.com'],
+  facebook:  ['facebook.com', 'fb.com', 'fb.watch', 'm.facebook.com'],
+  instagram: ['instagram.com', 'instagr.am'],
+  twitter:   ['twitter.com', 'x.com'],
+  tiktok:    ['tiktok.com'],
+  snapchat:  ['snapchat.com'],
 };
 const SOCIAL_PLATFORMS = [
   {key:'telegram',  label:'Telegram',  icon:SOCIAL_ICONS.telegram,  build:v=> v.startsWith('http') ? v : `https://t.me/${v.replace('@','')}`},
@@ -2788,7 +2807,53 @@ const SOCIAL_PLATFORMS = [
   {key:'facebook',  label:'Facebook',  icon:SOCIAL_ICONS.facebook,  build:v=> v.startsWith('http') ? v : `https://facebook.com/${v.replace('@','')}`},
   {key:'instagram', label:'Instagram', icon:SOCIAL_ICONS.instagram, build:v=> v.startsWith('http') ? v : `https://instagram.com/${v.replace('@','')}`},
   {key:'twitter',   label:'Twitter/X', icon:SOCIAL_ICONS.twitter,   build:v=> v.startsWith('http') ? v : `https://x.com/${v.replace('@','')}`},
+  {key:'tiktok',    label:'TikTok',    icon:SOCIAL_ICONS.tiktok,    build:v=> v.startsWith('http') ? v : `https://tiktok.com/@${v.replace('@','')}`},
+  {key:'snapchat',  label:'Snapchat',  icon:SOCIAL_ICONS.snapchat,  build:v=> v.startsWith('http') ? v : `https://snapchat.com/add/${v.replace('@','')}`},
 ];
+
+// Valida que lo escrito en un campo de red social genere, sí o sí, un
+// enlace de ESA red y de ninguna otra. Devuelve true/false.
+// - Vacío: válido (el campo es opcional).
+// - Si el usuario pega una URL completa: su dominio debe estar en la
+//   lista blanca de esa red (o ser subdominio de uno de esos dominios).
+// - Si el usuario escribe solo un texto tipo "algo.otrositio.com/x" (sin
+//   protocolo pero con pinta de dominio), también se valida contra la
+//   lista blanca — así no se cuela un dominio ajeno sin el "https://".
+// - WhatsApp es un caso especial: en vez de un usuario, pide un número.
+// - Cualquier otro texto simple se trata como usuario/handle de la propia
+//   red (eso es justamente lo que arma un link válido de esa red).
+function isValidSocialValue(key, rawValue){
+  const value = (rawValue || '').trim();
+  if(!value) return true;
+
+  const domains = SOCIAL_DOMAINS[key] || [];
+  function hostMatchesDomain(host){
+    host = (host || '').replace(/^www\./,'').toLowerCase();
+    return domains.some(d => host === d || host.endsWith('.' + d));
+  }
+
+  if(/^https?:\/\//i.test(value)){
+    let host;
+    try{ host = new URL(value).hostname; }catch(e){ return false; }
+    return hostMatchesDomain(host);
+  }
+
+  // Sin protocolo pero con pinta de dominio (p. ej. "youtube.com/algo" o
+  // "otrosite.net"): se valida igual, para que no sea una forma de
+  // esquivar el filtro simplemente omitiendo el "https://".
+  const firstSegment = value.split('/')[0];
+  if(/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(firstSegment)){
+    return hostMatchesDomain(firstSegment);
+  }
+
+  if(key === 'whatsapp'){
+    return /^\+?[0-9 ()-]{6,20}$/.test(value);
+  }
+
+  // Handle/usuario simple de la propia red: letras, números, puntos,
+  // guiones y guión bajo, con o sin @ inicial.
+  return /^@?[a-zA-Z0-9_.-]{1,40}$/.test(value);
+}
 
 async function openProfile(username){
   if(!username) return;
@@ -3256,21 +3321,37 @@ function toggleProfileEdit(){
     document.getElementById('edit-facebook').value = s.facebook || '';
     document.getElementById('edit-instagram').value = s.instagram || '';
     document.getElementById('edit-twitter').value = s.twitter || '';
+    document.getElementById('edit-tiktok').value = s.tiktok || '';
+    document.getElementById('edit-snapchat').value = s.snapchat || '';
   }
 }
 
 async function saveProfile(){
-  const users = await sGet('farol-users', true) || usersCache;
-  const key = currentUser.username.toLowerCase();
-  const u = users[key] || currentUser;
-  u.bio = document.getElementById('edit-bio').value.trim().slice(0, 220);
-  u.socials = {
+  const rawSocials = {
     telegram: document.getElementById('edit-telegram').value.trim(),
     whatsapp: document.getElementById('edit-whatsapp').value.trim(),
     facebook: document.getElementById('edit-facebook').value.trim(),
     instagram: document.getElementById('edit-instagram').value.trim(),
     twitter: document.getElementById('edit-twitter').value.trim(),
+    tiktok: document.getElementById('edit-tiktok').value.trim(),
+    snapchat: document.getElementById('edit-snapchat').value.trim(),
   };
+
+  // Cada campo solo puede contener un enlace/usuario de SU PROPIA red;
+  // si alguno no coincide con esa red, se detiene el guardado por
+  // completo y se avisa cuál campo hay que corregir.
+  for(const p of SOCIAL_PLATFORMS){
+    if(!isValidSocialValue(p.key, rawSocials[p.key])){
+      showToast(`${p.label}: Bitte gib nur einen ${p.label}-Link oder -Benutzernamen ein.`, 'error');
+      return;
+    }
+  }
+
+  const users = await sGet('farol-users', true) || usersCache;
+  const key = currentUser.username.toLowerCase();
+  const u = users[key] || currentUser;
+  u.bio = document.getElementById('edit-bio').value.trim().slice(0, 220);
+  u.socials = rawSocials;
   users[key] = u;
   await sSet('farol-users', users, true);
   usersCache = users;
