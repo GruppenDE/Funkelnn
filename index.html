@@ -4103,9 +4103,53 @@ function closeIosInstallModal(){
 }
 
 /* ---------------- SERVICE WORKER (enables install/offline shell) ---------------- */
+// PROBLEMA COMÚN EN PWAs: el Service Worker cachea index.html la primera vez
+// que alguien visita la app, y a partir de ahí sigue sirviendo esa copia
+// aunque subamos un archivo nuevo al servidor — el navegador nunca llega a
+// descargar (ni ejecutar) el código corregido hasta que el SW se actualiza
+// "de verdad". Por eso un fix en el código puede parecer que "no se aplicó"
+// al refrescar: en realidad el usuario sigue viendo la versión vieja.
+// Esta lógica: (1) revisa si hay una versión nueva del SW apenas carga la
+// página, (2) si la hay, la activa de inmediato en vez de dejarla "esperando"
+// a que se cierren todas las pestañas, y (3) recarga la página UNA sola vez
+// (con guardia contra loops) para que el usuario quede corriendo el código
+// más reciente sin tener que borrar caché a mano.
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW-Registrierung fehlgeschlagen', err));
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Si ya hay un SW nuevo instalado y esperando (detectado en una visita
+      // anterior), lo activamos ahora.
+      if(reg.waiting){
+        reg.waiting.postMessage({type:'SKIP_WAITING'});
+      }
+      // Pide explícitamente revisar si hay una versión más nueva del sw.js
+      // en el servidor, en vez de esperar pasivamente al ciclo normal del
+      // navegador (que puede tardar horas).
+      reg.update().catch(()=>{});
+      // Cuando el SW detecta una actualización, la nueva versión pasa por
+      // "installing" -> "installed". En cuanto queda instalada y ya había un
+      // controlador previo (o sea, no es la primera instalación), la
+      // activamos de inmediato en vez de dejarla en espera.
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if(!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+            newWorker.postMessage({type:'SKIP_WAITING'});
+          }
+        });
+      });
+    }).catch(err => console.warn('SW-Registrierung fehlgeschlagen', err));
+
+    // En cuanto el nuevo SW toma el control (tras el SKIP_WAITING de arriba),
+    // recargamos la página para que quede corriendo el HTML/JS más reciente.
+    // El guardia evita un loop de recargas si algo sale mal.
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if(refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   });
 }
 
