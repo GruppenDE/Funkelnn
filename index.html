@@ -3474,13 +3474,15 @@ async function handleGalleryFile(e){
   const file = e.target.files[0];
   if(!file) return;
   try{
-    // Generamos dos versiones: una miniatura chica (para la grilla, que vive
+    // Generamos dos versiones: una miniatura (para la grilla, que vive
     // dentro del array de la galería) y la foto completa (que se guarda en
     // SU PROPIO documento de Firestore, aparte). Así el documento de la
     // galería nunca se acerca al límite de 1 MB, sin importar cuántas fotos
-    // tenga el usuario.
+    // tenga el usuario. La miniatura se genera a 240x240 (antes 160x160,
+    // con más calidad también) porque en pantallas retina/HiDPI 160px se
+    // veía borrosa al mostrarse en una celda de ~150-160px de la grilla.
     const fullDataUrl = await resizeImageFile(file, 900, 900, 0.8);
-    const thumbDataUrl = await resizeImageFile(file, 160, 160, 0.55);
+    const thumbDataUrl = await resizeImageFile(file, 240, 240, 0.68);
     const caption = (prompt('Schreibe eine Beschreibung für dein Foto (optional):', '') || '').slice(0, 140);
     const photoId = Date.now()+'-'+Math.random().toString(36).slice(2,7);
     const username = currentUser.username;
