@@ -1703,7 +1703,7 @@
       <div class="dm-list-head">
         <div class="dm-list-title">💬 Foto-Kommentare</div>
       </div>
-      <div class="dm-list-sub" id="photo-notif-sub" style="margin-bottom:14px;">Wer hat deine Fotos kommentiert</div>
+      <div class="dm-list-sub" id="photo-notif-sub" style="margin-bottom:14px;">Kommentare zu deinen Fotos & Antworten vom Admin</div>
       <div class="dm-list-items" id="photo-notif-items"></div>
     </div>
   </div>
@@ -1882,8 +1882,16 @@ let dmBadgeRequestId = 0;
 // de arriba.
 let myGalleryCache = [];
 let myPhotoCommentReadTs = 0;
+// NUEVO: fotos AJENAS donde yo comenté, para poder avisarme si el admin
+// responde ahí (aunque la foto no sea mía). Es un índice liviano
+// {photoId, owner} — el contenido real de los comentarios se lee de la
+// galería de cada owner (externalGalleryCache), no se duplica aquí.
+let myRepliedPhotoIndex = [];
+let externalGalleryCache = {}; // ownerLower -> fotos de esa galería (cacheadas en vivo)
+let externalGalleryUnsubs = {}; // ownerLower -> función para cancelar su listener
 let myGalleryUnsub = null;
 let photoCommentReadsUnsub = null;
+let myRepliedIndexUnsub = null;
 let photoNotifBadgeRequestId = 0;
 
 /* ---------------- STORAGE HELPERS (Firebase Firestore) ---------------- */
@@ -2052,6 +2060,9 @@ function galleryImgKey(photoId){ return 'farol-gallery-img-'+photoId; }
 // que le dejaron en sus fotos. Se usa para calcular la insignia de
 // notificación sobre el avatar propio del header.
 function photoCommentReadsKey(username){ return 'farol-photocomment-read-'+username.toLowerCase(); }
+// Índice personal de "fotos ajenas donde comenté", para poder detectar
+// respuestas del admin ahí aunque esas fotos no sean mías.
+function myRepliedPhotosKey(username){ return 'farol-myreplies-'+username.toLowerCase(); }
 
 // El avatar y el banner de cada usuario viven en su PROPIO documento de
 // Firestore (uno por usuario), no dentro del documento compartido
@@ -3033,6 +3044,9 @@ async function logout(){
   myDmReadsCache = {};
   myGalleryCache = [];
   myPhotoCommentReadTs = 0;
+  myRepliedPhotoIndex = [];
+  externalGalleryCache = {};
+  externalGalleryUnsubs = {};
   currentView = 'lobby';
   document.getElementById('view-lobby').classList.add('hidden');
   document.getElementById('view-chat').classList.add('hidden');
@@ -3912,12 +3926,29 @@ function collectUnreadPhotoComments(){
   if(!currentUser) return [];
   const photos = Array.isArray(myGalleryCache) ? myGalleryCache : [];
   const meLower = currentUser.username.toLowerCase();
+  const adminLower = ADMIN_NAME.toLowerCase();
   const lastRead = myPhotoCommentReadTs || 0;
   const items = [];
+  // 1) Comentarios de otras personas en MIS fotos (como antes).
   photos.forEach(p=>{
     (p.comments || []).forEach(c=>{
       if(c.user && c.user.toLowerCase() !== meLower){
-        items.push({photoId: p.id, thumb: p.thumb, user: c.user, text: c.text, ts: c.ts, unread: c.ts > lastRead});
+        items.push({photoId: p.id, owner: currentUser.username, thumb: p.thumb, user: c.user, text: c.text, ts: c.ts, unread: c.ts > lastRead, isReply: false});
+      }
+    });
+  });
+  // 2) NUEVO: respuestas del admin a MIS comentarios en fotos que NO son
+  // mías. Se recorre el índice de "fotos ajenas donde comenté" y se busca,
+  // en la galería cacheada de cada dueño, comentarios del admin.
+  myRepliedPhotoIndex.forEach(entry=>{
+    if(!entry || !entry.owner) return;
+    const extPhotos = externalGalleryCache[entry.owner.toLowerCase()];
+    if(!Array.isArray(extPhotos)) return;
+    const p = extPhotos.find(x=>x.id === entry.photoId);
+    if(!p) return;
+    (p.comments || []).forEach(c=>{
+      if(c.user && c.user.toLowerCase() === adminLower){
+        items.push({photoId: p.id, owner: entry.owner, thumb: p.thumb, user: c.user, text: c.text, ts: c.ts, unread: c.ts > lastRead, isReply: true});
       }
     });
   });
@@ -3968,10 +3999,63 @@ function startPhotoNotifRealtime(){
     catch(e){ myPhotoCommentReadTs = 0; }
     refreshPhotoCommentBadge();
   }, err => console.error('photo comment reads listener failed', err));
+
+  // NUEVO: carga mi índice de "fotos ajenas donde comenté" y lo mantiene en
+  // vivo, para poder detectar respuestas del admin ahí.
+  myRepliedIndexUnsub = kvDocRef(myRepliedPhotosKey(currentUser.username)).onSnapshot(snap=>{
+    try{ myRepliedPhotoIndex = snap.exists ? (JSON.parse(snap.data().value || '[]') || []) : []; }
+    catch(e){ myRepliedPhotoIndex = []; }
+    // Cada foto ajena de ese índice necesita su propio listener de galería
+    // para poder ver, en tiempo real, si el admin ya respondió.
+    myRepliedPhotoIndex.forEach(entry=>{ if(entry && entry.owner) ensureExternalGalleryListener(entry.owner); });
+    refreshPhotoCommentBadge();
+    const modal = document.getElementById('photo-notif-modal');
+    if(modal && !modal.classList.contains('hidden')) renderPhotoNotifications();
+  }, err => console.error('replied-photos index listener failed', err));
 }
 function stopPhotoNotifRealtime(){
   if(myGalleryUnsub){ myGalleryUnsub(); myGalleryUnsub = null; }
   if(photoCommentReadsUnsub){ photoCommentReadsUnsub(); photoCommentReadsUnsub = null; }
+  if(myRepliedIndexUnsub){ myRepliedIndexUnsub(); myRepliedIndexUnsub = null; }
+  Object.keys(externalGalleryUnsubs).forEach(owner=>{
+    try{ externalGalleryUnsubs[owner](); }catch(e){}
+  });
+  externalGalleryUnsubs = {};
+  externalGalleryCache = {};
+}
+
+// Abre (si no existe ya) un listener en vivo sobre la galería de `owner`,
+// para poder detectar de inmediato si el admin responde a un comentario mío
+// ahí. No hace falta bajar TODAS las galerías de la app — solo las de las
+// personas cuyas fotos yo comenté alguna vez.
+function ensureExternalGalleryListener(owner){
+  if(!owner) return;
+  const key = owner.toLowerCase();
+  if(externalGalleryUnsubs[key]) return;
+  externalGalleryUnsubs[key] = kvDocRef(galleryKey(owner)).onSnapshot(snap=>{
+    try{ externalGalleryCache[key] = snap.exists ? (JSON.parse(snap.data().value || '[]') || []) : []; }
+    catch(e){ externalGalleryCache[key] = []; }
+    refreshPhotoCommentBadge();
+    const modal = document.getElementById('photo-notif-modal');
+    if(modal && !modal.classList.contains('hidden')) renderPhotoNotifications();
+  }, err => console.error('external gallery listener failed', owner, err));
+}
+
+// Agrega (una sola vez por foto) la foto que acabo de comentar a mi índice
+// de "fotos ajenas donde comenté", para poder recibir aviso si el admin
+// responde ahí más adelante.
+async function registerMyReplyTarget(photoId, owner){
+  if(!currentUser || !photoId || !owner) return;
+  if(myRepliedPhotoIndex.some(e=>e.photoId === photoId && e.owner === owner)) return;
+  myRepliedPhotoIndex.push({photoId, owner});
+  ensureExternalGalleryListener(owner);
+  try{
+    await sTransact(myRepliedPhotosKey(currentUser.username), (list)=>{
+      list = Array.isArray(list) ? list : [];
+      if(!list.some(e=>e.photoId === photoId && e.owner === owner)) list.push({photoId, owner});
+      return list;
+    });
+  }catch(e){ console.error('No se pudo guardar el índice de respuestas', e); }
 }
 
 // Marca todos los comentarios como vistos (se llama al abrir el panel de
@@ -4010,11 +4094,13 @@ function renderPhotoNotifications(){
   items.forEach(it=>{
     const row = document.createElement('div');
     row.className = 'photo-notif-row' + (it.unread ? ' unread' : '');
-    row.onclick = () => openPhotoNotificationItem(it.photoId);
+    row.onclick = () => openPhotoNotificationItem(it.photoId, it.owner);
     const av = buildAvatarEl(it.user, 'avatar-sm');
     const info = document.createElement('div');
     info.className = 'photo-notif-text';
-    info.innerHTML = `<b>${it.user}</b> hat dein Foto kommentiert<span class="photo-notif-preview"></span>`;
+    info.innerHTML = it.isReply
+      ? `<b>${it.user}</b> hat auf deinen Kommentar geantwortet<span class="photo-notif-preview"></span>`
+      : `<b>${it.user}</b> hat dein Foto kommentiert<span class="photo-notif-preview"></span>`;
     info.querySelector('.photo-notif-preview').textContent = it.text || '';
     const time = document.createElement('div');
     time.className = 'photo-notif-time';
@@ -4038,11 +4124,12 @@ async function openPhotoNotifications(){
 function closePhotoNotifications(){
   document.getElementById('photo-notif-modal').classList.add('hidden');
 }
-// Tocar una notificación puntual lleva directo a esa foto en mi propio
-// perfil (con su lightbox de comentarios ya abierto).
-async function openPhotoNotificationItem(photoId){
+// Tocar una notificación puntual lleva directo a esa foto — en mi propio
+// perfil si era un comentario en una foto mía, o en el perfil de quien sea
+// dueño de la foto si era una respuesta del admin a un comentario mío ahí.
+async function openPhotoNotificationItem(photoId, owner){
   closePhotoNotifications();
-  await openProfile(currentUser.username);
+  await openProfile(owner || currentUser.username);
   if(photoId) openLightbox(photoId);
 }
 
@@ -5150,6 +5237,13 @@ async function handleAddComment(e){
   currentGalleryPhotos = photos;
   renderLightbox();
   renderGallery(photos);
+  // Si comenté en una foto que NO es mía, guardo esa foto en mi índice de
+  // "fotos ajenas donde comenté" — así, si el admin responde ahí más
+  // adelante, me llega la notificación aunque la foto no sea mía. El propio
+  // admin no necesita este seguimiento (no se notifica a sí mismo).
+  if(currentUser.username !== ADMIN_NAME && viewingProfile && viewingProfile.toLowerCase() !== currentUser.username.toLowerCase()){
+    registerMyReplyTarget(p.id, viewingProfile);
+  }
 }
 
 /* ================= APP INSTALL BANNER (PWA: Android + iOS) ================= */
