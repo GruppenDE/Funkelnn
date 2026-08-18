@@ -599,6 +599,12 @@
   }
   .profile-gender-chip.gender-male{color:#7fb8ff;border-color:rgba(127,184,255,.35);background:rgba(127,184,255,.1);}
   .profile-gender-chip.gender-female{color:#ff8fc4;border-color:rgba(255,143,196,.35);background:rgba(255,143,196,.1);}
+  .profile-gender-chip-own{padding:2px 4px 2px 10px;cursor:pointer;}
+  .profile-gender-chip-own select{
+    background:transparent;border:none;color:inherit;font:inherit;font-weight:600;
+    outline:none;cursor:pointer;padding:2px 4px;
+  }
+  .profile-gender-chip-own select option{background:var(--bg-panel);color:var(--text-cream);}
   .profile-name{font-family:'Fredoka';font-size:19px;font-weight:600;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .profile-handle{font-size:12.5px;color:var(--text-muted);}
   .profile-head-actions{display:flex;flex-wrap:wrap;gap:8px;}
@@ -2382,6 +2388,38 @@ async function showChat(){
 }
 
 /* ---------------- GÉNERO (para filtrar "Descubrir" por género opuesto) ---------------- */
+// Cambio rápido de género directamente desde el chip del propio perfil
+// (sin tener que entrar al modo "Editar perfil"). Sirve para cualquier
+// cuenta, incluida la del administrador.
+async function quickSetGender(gender){
+  if(!currentUser) return;
+  const key = currentUser.username.toLowerCase();
+  let u = null;
+  try{
+    await sTransact('farol-users', (users) => {
+      users = users || {};
+      u = users[key] || currentUser;
+      u.gender = gender;
+      users[key] = u;
+      return users;
+    });
+  }catch(e){
+    console.error('Geschlecht konnte nicht gespeichert werden', e);
+    showToast('Konnte nicht gespeichert werden. Versuche es erneut.', 'error');
+    renderProfileView(currentUser); // revierte el select al valor real conocido
+    return;
+  }
+  usersCache[key] = u;
+  currentUser = u;
+  cacheUserLocally(currentUser);
+  renderProfileView(currentUser);
+  if(currentView === 'discover'){
+    await loadDiscoverList();
+    discoverIndex = 0;
+    renderDiscoverCard();
+  }
+  showToast('Geschlecht aktualisiert.', 'success');
+}
 function openGenderModal(){
   document.getElementById('gender-modal').classList.remove('hidden');
 }
@@ -3767,15 +3805,25 @@ function renderProfileView(u){
   document.getElementById('profile-handle').textContent = '@' + u.username.toLowerCase();
   document.getElementById('profile-bio').textContent = u.bio || 'Es wurde noch keine Biografie geschrieben.';
 
-  // Chip visible del género: sirve para confirmar de un vistazo si quedó
-  // guardado (útil para revisar cuentas de prueba, como pidió el usuario).
+  const isOwn = currentUser && currentUser.username === u.username;
+
+  // Chip de género: en el propio perfil (incluido el admin) es un selector
+  // clickeable que guarda al instante, así cambiar de género no requiere
+  // entrar al modo "Editar perfil". En perfiles ajenos es solo informativo.
   const genderChip = document.getElementById('profile-gender-chip');
   const genderLabels = {male:'♂ Mann', female:'♀ Frau', other:'⚧ Divers'};
   if(genderChip){
-    if(u.gender && genderLabels[u.gender]){
+    genderChip.classList.remove('hidden');
+    if(isOwn){
+      genderChip.innerHTML = `<select id="profile-gender-select" onchange="quickSetGender(this.value)" title="Geschlecht ändern">
+        <option value="male"${u.gender==='male'?' selected':''}>♂ Mann</option>
+        <option value="female"${u.gender==='female'?' selected':''}>♀ Frau</option>
+        <option value="other"${(!u.gender||u.gender==='other')?' selected':''}>⚧ Divers</option>
+      </select>`;
+      genderChip.className = 'profile-gender-chip profile-gender-chip-own gender-' + (u.gender || 'other');
+    }else if(u.gender && genderLabels[u.gender]){
       genderChip.textContent = genderLabels[u.gender];
       genderChip.className = 'profile-gender-chip gender-' + u.gender;
-      genderChip.classList.remove('hidden');
     }else{
       genderChip.textContent = '';
       genderChip.classList.add('hidden');
@@ -3809,8 +3857,6 @@ function renderProfileView(u){
   if(avatarCache[aKey] === undefined){
     sGet(avatarKey(u.username), true).catch(()=>{});
   }
-
-  const isOwn = currentUser && currentUser.username === u.username;
 
   // ---- Likes chip: cuántos likes tiene este perfil, y si currentUser ya
   // le dio like (para pintar el corazón activo). ----
