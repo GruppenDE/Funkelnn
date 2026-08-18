@@ -703,12 +703,6 @@
     color:#241a03;background:linear-gradient(90deg,#FFD54A,#FF9F4A);
     padding:1px 6px;border-radius:20px;margin-left:6px;vertical-align:middle;
   }
-  .bubble-text.admin-text{
-    background:linear-gradient(90deg,#FFD54A,#FF6BD6,#7C4DFF,#FFD54A);
-    background-size:300% auto;-webkit-background-clip:text;background-clip:text;color:transparent;
-    font-weight:600;animation:adminShimmer 5s linear infinite;
-  }
-  @keyframes adminShimmer{0%{background-position:0% center;}100%{background-position:300% center;}}
   .msg-meta b.admin-name{background:linear-gradient(90deg,#FFD54A,#FF6BD6);-webkit-background-clip:text;background-clip:text;color:transparent;}
 
   .lightbox-panel{
@@ -2339,7 +2333,7 @@ function renderMessages(msgs){
         b.className = 'admin-name';
         const badge = document.createElement('span');
         badge.className = 'admin-badge';
-        badge.textContent = '👑 ADMIN';
+        badge.textContent = '⭐ ADMIN';
         meta.appendChild(b);
         meta.appendChild(badge);
       }else{
@@ -3148,7 +3142,7 @@ function closeProfile(){
 
 function renderProfileView(u){
   document.getElementById('profile-name').innerHTML = u.isAdmin
-    ? `${u.username} <span class="admin-badge">👑 ADMIN</span>`
+    ? `${u.username} <span class="admin-badge">⭐ ADMIN</span>`
     : u.username;
   document.getElementById('profile-handle').textContent = '@' + u.username.toLowerCase();
   document.getElementById('profile-bio').textContent = u.bio || 'Es wurde noch keine Biografie geschrieben.';
