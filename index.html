@@ -4334,7 +4334,7 @@ async function startPrivateChat(){
 async function openDirectChat(otherUsername){
   dmPartner = otherUsername;
   currentRoom = dmRoomId(currentUser.username, otherUsername);
-  closeProfile();
+  hideProfileModal();
   closeSidebars();
 
   document.getElementById('view-lobby').classList.add('hidden');
@@ -4371,7 +4371,7 @@ async function openDirectChatByUsers(userA, userB){
 
   dmPartner = null;
   currentRoom = dmRoomId(userA, userB);
-  closeProfile();
+  hideProfileModal();
   closeSidebars();
 
   document.getElementById('view-lobby').classList.add('hidden');
@@ -4388,9 +4388,26 @@ async function openDirectChatByUsers(userA, userB){
   attachActiveRoomListener(currentRoom);
   document.getElementById('msg-input').focus();
 }
-function closeProfile(){
+// Oculta el modal de perfil sin pasar por closeProfile() (ver más abajo):
+// closeProfile() termina siendo envuelta por el sistema de navegación con
+// el botón "atrás" (ver el IIFE al final del archivo), que en vez de
+// cerrar el modal al toque hace history.back() y espera al evento
+// "popstate" (asíncrono). Si esta función se llamara justo antes de abrir
+// un chat privado (que empuja SU PROPIO paso al historial de inmediato,
+// de forma síncrona, con history.pushState), ese "atrás" pendiente termina
+// procesándose DESPUÉS de que el chat ya se abrió — y como el paso que
+// queda arriba del historial pasa a ser el del chat (no el del perfil), es
+// el chat el que se cierra por error, devolviendo a la persona al inicio.
+// Repetir el intento desincroniza el historial cada vez más, hasta que se
+// queda sin pasos propios de la app y termina saliendo de la página
+// entera. Por eso, para cerrar el perfil ANTES de abrir un chat privado,
+// usamos esta versión "cruda" que no toca el historial del navegador.
+function hideProfileModal(){
   document.getElementById('profile-modal').classList.add('hidden');
   viewingProfile = null;
+}
+function closeProfile(){
+  hideProfileModal();
 }
 
 function renderProfileView(u){
