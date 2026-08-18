@@ -3995,8 +3995,15 @@ function startPhotoNotifRealtime(){
   }, err => console.error('gallery listener failed', err));
 
   photoCommentReadsUnsub = kvDocRef(photoCommentReadsKey(currentUser.username)).onSnapshot(snap=>{
-    try{ myPhotoCommentReadTs = snap.exists ? (JSON.parse(snap.data().value || '0') || 0) : 0; }
-    catch(e){ myPhotoCommentReadTs = 0; }
+    let incoming = 0;
+    try{ incoming = snap.exists ? (JSON.parse(snap.data().value || '0') || 0) : 0; }
+    catch(e){ incoming = 0; }
+    // Nunca retrocedemos: si el panel ya se marcó como leído localmente
+    // (markPhotoCommentsRead actualiza myPhotoCommentReadTs al instante),
+    // un snapshot desfasado/retrasado del servidor con el valor viejo NO
+    // debe "revivir" notificaciones que la persona ya vio. Solo aceptamos
+    // valores iguales o más nuevos que lo que ya tenemos en memoria.
+    if(incoming >= myPhotoCommentReadTs) myPhotoCommentReadTs = incoming;
     refreshPhotoCommentBadge();
   }, err => console.error('photo comment reads listener failed', err));
 
@@ -4066,8 +4073,14 @@ async function markPhotoCommentsRead(){
   const ts = Date.now();
   myPhotoCommentReadTs = ts;
   refreshPhotoCommentBadge();
-  try{ await sSet(photoCommentReadsKey(currentUser.username), ts, true); }
-  catch(e){ console.error('No se pudo marcar los comentarios como leídos', e); }
+  // sSetCritical reintenta unas veces en vez de rendirse al primer fallo de
+  // red: con el sSet simple de antes, si esa única escritura fallaba (p.ej.
+  // el panel se cerró automáticamente al tocar una notificación, cortando
+  // la conexión/pestaña un instante), el "leído" quedaba solo en memoria.
+  // Al re-sincronizar después, el listener de Firestore volvía a traer el
+  // valor viejo y las notificaciones "revivían" aunque ya se hubieran visto.
+  const ok = await sSetCritical(photoCommentReadsKey(currentUser.username), ts, true);
+  if(!ok) console.error('No se pudo marcar los comentarios como leídos (sin conexión persistente)');
 }
 
 // Formatea "hace cuánto" de forma breve (m/h/d), igual de simple que el
