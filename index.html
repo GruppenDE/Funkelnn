@@ -2037,7 +2037,11 @@ function applyAvatarStyle(el, username){
   });
   if(avatarCache[key] === undefined){
     sGet(avatarKey(username), true).then(val => {
-      notifyAvatarUpdated(username, val);
+      // Si el documento nuevo (por usuario) no tiene nada guardado, puede
+      // ser una cuenta vieja cuya foto sigue viviendo en el campo legacy
+      // u.avatar (del documento compartido). Antes de confirmar "sin foto"
+      // probamos ahí primero, para no perder fotos que sí existen.
+      notifyAvatarUpdated(username, val || u.avatar || null);
     }).catch(()=>{ avatarCache[key] = null; });
   }
 }
@@ -2118,11 +2122,11 @@ async function preloadAvatarsFor(usernames){
         // avisamos por notifyAvatarUpdated para que todo lo que esté
         // suscrito (Descubrir, mensajes, perfil) se corrija solo.
         sGet(avatarKey(key), true).then(val => {
-          notifyAvatarUpdated(key, val);
+          notifyAvatarUpdated(key, val || userLookup(key).avatar || null);
         }).catch(()=>{});
       }else{
         try{
-          const val = (await sGet(avatarKey(key), true)) || null;
+          const val = (await sGet(avatarKey(key), true)) || userLookup(key).avatar || null;
           avatarCache[key] = val;
           setLocalAvatarCache(key, val);
         }
@@ -4191,10 +4195,13 @@ async function paintDiscoverPhoto(username){
   });
   try{
     const val = await sGet(avatarKey(username), true);
-    // notifyAvatarUpdated guarda el valor confirmado y avisa a todo lo que
-    // esté suscrito a este usuario (incluida esta misma tarjeta si sigue
-    // mostrándolo), no solo a esta función.
-    notifyAvatarUpdated(username, val);
+    // Si el documento nuevo (por usuario) no tiene nada guardado, puede ser
+    // una cuenta vieja cuya foto sigue viviendo en el campo legacy u.avatar
+    // (del documento compartido) — probamos ahí antes de confirmar "sin
+    // foto". notifyAvatarUpdated guarda el valor confirmado y avisa a todo
+    // lo que esté suscrito a este usuario (incluida esta misma tarjeta si
+    // sigue mostrándolo), no solo a esta función.
+    notifyAvatarUpdated(username, val || userLookup(username).avatar || null);
   }catch(e){
     // Sin conexión a Firestore: como último recurso, mejor mostrar lo
     // último que sepamos (aunque pueda estar desactualizado) que dejar
