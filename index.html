@@ -4224,11 +4224,13 @@ async function handleAvatarFile(e){
   if(!file) return;
   try{
     // La foto de perfil ya no se usa solo como miniatura circular chica:
-    // en "Descubrir" se muestra a pantalla completa, así que 220x220 se
-    // veía muy pixelada/borrosa ahí. Subimos resolución y calidad; el
-    // documento propio del avatar tiene su propio límite de 1MB en
-    // Firestore y a esta calidad se mantiene muy por debajo de eso.
-    const dataUrl = await resizeImageFile(file, 800, 800, 0.85);
+    // en "Descubrir" se muestra a pantalla completa (hasta 480px CSS de
+    // ancho), y en pantallas retina/HiDPI (2x-3x) eso son 960-1440px
+    // físicos reales, más aún de alto. 800x800 se quedaba corto y se veía
+    // pixelada al hacer zoom con "cover". Subimos a 1080x1080: sigue
+    // muy por debajo del límite de 1MB del documento propio del avatar
+    // en Firestore, pero ya cubre pantallas retina sin verse borrosa.
+    const dataUrl = await resizeImageFile(file, 1080, 1080, 0.85);
     const key = currentUser.username.toLowerCase();
     const ok = await sSetCritical(avatarKey(currentUser.username), dataUrl, true);
     avatarCache[key] = dataUrl;
