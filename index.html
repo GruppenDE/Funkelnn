@@ -2015,10 +2015,16 @@ async function ensureFirebaseAuth(){
 }
 
 async function init(){
+  // --- DIAGNÓSTICO TEMPORAL: quitar estos console.log una vez encontrado el bug ---
+  console.log('[init] arrancando...');
   await ensureFirebaseAuth();
+  console.log('[init] ensureFirebaseAuth listo. auth.currentUser =', auth.currentUser);
   renderRoomList();
   await refreshUsersCache();
   const session = await sGet('farol-session', false);
+  console.log('[init] farol-session leído de localStorage =', JSON.stringify(session));
+  console.log('[init] localStorage.farol-session (crudo) =', localStorage.getItem('farol-session'));
+  console.log('[init] localStorage.farol-user-cache (crudo) =', localStorage.getItem('farol-user-cache'));
   if(session){
     if(session === ADMIN_NAME){
       // No basta con que 'farol-session' diga que es el admin (eso se podría
@@ -2046,6 +2052,7 @@ async function init(){
     // cerramos la sesión de verdad si el servidor confirma que la cuenta
     // ya no existe.
     const cachedUser = getCachedUser(session);
+    console.log('[init] getCachedUser(', session, ') =', cachedUser);
     if(cachedUser){
       currentUser = cachedUser;
       usersCache[session.toLowerCase()] = cachedUser;
@@ -2064,11 +2071,13 @@ async function init(){
     let users = null;
     for(let attempt = 0; attempt < 3; attempt++){
       const res = await sGetSafe('farol-users', true);
+      console.log('[init] intento', attempt, 'sGetSafe(farol-users) ok=', res.ok);
       if(res.ok){ users = res.value || {}; break; }
       await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
     }
     if(users){
       const u = users[session.toLowerCase()];
+      console.log('[init] usuario encontrado en Firestore para', session, '=', u);
       if(u){
         currentUser = u;
         usersCache[session.toLowerCase()] = u;
@@ -2076,8 +2085,11 @@ async function init(){
         showChat();
         return;
       }
+    }else{
+      console.log('[init] no se pudo leer farol-users de Firestore tras 3 intentos');
     }
   }
+  console.log('[init] llegó al final sin restaurar sesión -> showAuth()');
   showAuth();
 }
 
