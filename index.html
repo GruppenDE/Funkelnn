@@ -282,6 +282,17 @@
     outline:none;transition:border .15s;
   }
   .field input:focus{border-color:var(--accent-amber);}
+  .field select{
+    width:100%;background:var(--bg-void);border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;padding:11px 13px;color:var(--text-cream);font-size:14px;
+    outline:none;transition:border .15s;font-family:'Inter',sans-serif;
+    appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239296BE' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;background-size:16px;
+    padding-right:36px;
+  }
+  .field select:focus{border-color:var(--accent-amber);}
+  .field select option{background:var(--bg-panel);color:var(--text-cream);}
   .btn-primary{
     width:100%;background:var(--accent-amber);color:#2b0618;border:none;
     border-radius:12px;padding:12px 0;font-weight:600;font-size:15px;cursor:pointer;
@@ -1186,6 +1197,15 @@
             <div class="field"><label>Benutzername</label><input id="reg-username" type="text" placeholder="3 bis 16 Zeichen" autocomplete="username" required></div>
             <div class="field"><label>E-Mail-Adresse</label><input id="reg-email" type="email" placeholder="deine@email.com" autocomplete="email" required></div>
             <div class="field"><label>Passwort</label><input id="reg-password" type="password" placeholder="mindestens 6 Zeichen" autocomplete="new-password" required></div>
+            <div class="field">
+              <label>Ich bin</label>
+              <select id="reg-gender" required>
+                <option value="" disabled selected>Wähle eine Option</option>
+                <option value="male">Mann</option>
+                <option value="female">Frau</option>
+                <option value="other">Divers</option>
+              </select>
+            </div>
             <button class="btn-primary" type="submit">Konto erstellen</button>
           </form>
           <div class="switch-line">Hast du schon ein Konto? <a onclick="switchTab('login')">Anmelden</a></div>
@@ -1472,6 +1492,14 @@
         <!-- EDIT MODE -->
         <div id="profile-edit-mode" class="hidden">
           <div class="field"><label>Biografie</label><textarea id="edit-bio" maxlength="220" rows="3" placeholder="Erzähl dem Platz etwas über dich..."></textarea></div>
+          <div class="field">
+            <label>Ich bin</label>
+            <select id="edit-gender">
+              <option value="male">Mann</option>
+              <option value="female">Frau</option>
+              <option value="other">Divers</option>
+            </select>
+          </div>
           <div class="field"><label>Telegram</label><input id="edit-telegram" placeholder="Benutzername oder t.me-Link"></div>
           <div class="field"><label>WhatsApp</label><input id="edit-whatsapp" placeholder="Nummer, z. B. 51999999999"></div>
           <div class="field"><label>Facebook</label><input id="edit-facebook" placeholder="Benutzername oder facebook.com-Link"></div>
@@ -1551,6 +1579,25 @@
       <div class="modal-actions">
         <button class="btn-ghost" onclick="closeBannerPositionModal()">Abbrechen</button>
         <button class="btn-primary" onclick="saveBannerPosition()">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gender-modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3>Fast geschafft</h3>
+      <div class="sub">Wähle eine Option, damit wir dir passende Profile im Entdecken-Bereich zeigen können.</div>
+      <div class="field">
+        <label>Ich bin</label>
+        <select id="gender-modal-select">
+          <option value="male">Mann</option>
+          <option value="female">Frau</option>
+          <option value="other">Divers</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="skipGenderModal()">Später</button>
+        <button class="btn-primary" onclick="saveGenderModal()">Speichern</button>
       </div>
     </div>
   </div>
@@ -2265,7 +2312,7 @@ async function loadAdminUser(){
     const saved = users && users[ADMIN_NAME.toLowerCase()];
     if(saved){
       return Object.assign(base, {
-        bio: saved.bio, socials: saved.socials,
+        bio: saved.bio, socials: saved.socials, gender: saved.gender,
         avatar: saved.avatar, banner: saved.banner,
         bannerPos: saved.bannerPos, bannerZoom: saved.bannerZoom
       });
@@ -2316,6 +2363,52 @@ async function showChat(){
   // privado gratis), al estilo Knuddels: se muestra automáticamente cada
   // vez que se entra a la app; el usuario la cierra (✕) para ir al lobby.
   openDiscoverView();
+  // Cuentas creadas con Google (o cuentas antiguas de antes de que existiera
+  // este campo) no tienen género guardado todavía. Sin él no podemos
+  // mostrarle a la persona perfiles del género opuesto en "Descubrir", así
+  // que se lo pedimos con un pequeño modal (se puede posponer con "Später").
+  if(currentUser && !currentUser.gender){
+    openGenderModal();
+  }
+}
+
+/* ---------------- GÉNERO (para filtrar "Descubrir" por género opuesto) ---------------- */
+function openGenderModal(){
+  document.getElementById('gender-modal').classList.remove('hidden');
+}
+function skipGenderModal(){
+  document.getElementById('gender-modal').classList.add('hidden');
+}
+async function saveGenderModal(){
+  const gender = document.getElementById('gender-modal-select').value;
+  if(!currentUser) return;
+  const key = currentUser.username.toLowerCase();
+  let u = null;
+  try{
+    await sTransact('farol-users', (users) => {
+      users = users || {};
+      u = users[key] || currentUser;
+      u.gender = gender;
+      users[key] = u;
+      return users;
+    });
+  }catch(e){
+    console.error('Geschlecht konnte nicht gespeichert werden', e);
+    showToast('Konnte nicht gespeichert werden. Versuche es erneut.', 'error');
+    return;
+  }
+  usersCache[key] = u;
+  currentUser = u;
+  cacheUserLocally(currentUser);
+  document.getElementById('gender-modal').classList.add('hidden');
+  // El filtro de "Descubrir" depende del género recién guardado, así que
+  // recargamos la lista para que se aplique de inmediato.
+  if(currentView === 'discover'){
+    await loadDiscoverList();
+    discoverIndex = 0;
+    renderDiscoverCard();
+  }
+  showToast('Gespeichert.', 'success');
 }
 
 /* ---------------- LOBBY ---------------- */
@@ -2500,11 +2593,13 @@ async function handleRegister(e){
   const username = document.getElementById('reg-username').value.trim();
   const email = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-password').value;
+  const gender = document.getElementById('reg-gender').value;
 
   if(!/^[a-zA-Z0-9_ÁÉÍÓÚáéíóúÑñ]{3,16}$/.test(username)){
     showError('Der Benutzername muss zwischen 3 und 16 Zeichen lang sein.'); return;
   }
   if(password.length < 6){ showError('Das Passwort muss mindestens 6 Zeichen lang sein.'); return; }
+  if(!gender){ showError('Bitte wähle eine Option bei "Ich bin" aus.'); return; }
 
   const key = username.toLowerCase();
   let newUser = null;
@@ -2517,7 +2612,7 @@ async function handleRegister(e){
       users = users || {};
       if(users[key]){ taken = true; return users; }
       newUser = {
-        username, email, passwordHash: hashPw(password),
+        username, email, passwordHash: hashPw(password), gender,
         color: colorFor(username), createdAt: Date.now(), provider: 'manual'
       };
       users[key] = newUser;
@@ -3722,6 +3817,37 @@ function renderProfileView(u){
 // array de nombres de usuario dentro del propio registro en el documento
 // compartido "farol-users" (u.likes), usando una transacción atómica para
 // que dos personas dando like casi al mismo tiempo no se pisen entre sí.
+// Un mismo usuario solo puede tener 5 likes "activos" repartidos entre
+// todos los perfiles a la vez (como pidió: "solo se permita dar like a 5
+// fotos"). Para dar un 6to, primero tiene que quitar alguno de los 5.
+const MAX_LIKES_GIVEN = 5;
+function countLikesGivenBy(users, liker){
+  return Object.values(users || {}).reduce((n, other) => {
+    const otherLikes = Array.isArray(other && other.likes) ? other.likes : [];
+    return n + (otherLikes.some(l => l.toLowerCase() === liker.toLowerCase()) ? 1 : 0);
+  }, 0);
+}
+// Pinta el corazón/contador al toque, ANTES de esperar la respuesta del
+// servidor, para que dar like se sienta instantáneo en vez de "trabado".
+// Si el servidor termina devolviendo algo distinto (p. ej. porque se llegó
+// al límite de 5 likes), los renders de después de la transacción corrigen
+// la UI con el estado real.
+function paintLikeOptimistic(username, liked, count){
+  const key = username.toLowerCase();
+  if(viewingProfile && viewingProfile.toLowerCase() === key){
+    const countEl = document.getElementById('profile-likes-count');
+    const chip = document.getElementById('profile-likes-chip');
+    if(countEl) countEl.textContent = count;
+    if(chip) chip.classList.toggle('liked', liked);
+  }
+  if(currentView === 'discover' && discoverList[discoverIndex] &&
+     discoverList[discoverIndex].username.toLowerCase() === key){
+    const btn = document.getElementById('discover-full-like-btn');
+    const countEl = document.getElementById('discover-full-like-count');
+    if(btn) btn.classList.toggle('liked', liked);
+    if(countEl) countEl.textContent = count;
+  }
+}
 async function toggleProfileLike(username){
   if(!currentUser){ showToast('Melde dich an, um Likes zu vergeben.'); return; }
   if(!username) return;
@@ -3730,23 +3856,45 @@ async function toggleProfileLike(username){
     return;
   }
   const liker = currentUser.username;
+  const key = username.toLowerCase();
+
+  // ---- Respuesta instantánea (optimista), usando lo último que tenemos en
+  // caché local, mientras la transacción real viaja al servidor. ----
+  const cachedLikes = Array.isArray(usersCache[key] && usersCache[key].likes) ? usersCache[key].likes : [];
+  const alreadyLiked = cachedLikes.some(l => l.toLowerCase() === liker.toLowerCase());
+  if(alreadyLiked || countLikesGivenBy(usersCache, liker) < MAX_LIKES_GIVEN){
+    paintLikeOptimistic(username, !alreadyLiked, Math.max(0, cachedLikes.length + (alreadyLiked ? -1 : 1)));
+  }
+
   let likedNow = false;
+  let limitReached = false;
   let newUsers;
   try{
     newUsers = await sTransact('farol-users', (users) => {
       users = users || {};
-      const key = username.toLowerCase();
       const u = users[key] || (username === ADMIN_NAME ? buildAdminUser() : {username, color: colorFor(username), createdAt: Date.now()});
       u.likes = Array.isArray(u.likes) ? u.likes.slice() : [];
       const idx = u.likes.findIndex(l => l.toLowerCase() === liker.toLowerCase());
-      if(idx >= 0){ u.likes.splice(idx, 1); likedNow = false; }
-      else{ u.likes.push(liker); likedNow = true; }
+      if(idx >= 0){
+        u.likes.splice(idx, 1);
+        likedNow = false;
+      }else{
+        if(countLikesGivenBy(users, liker) >= MAX_LIKES_GIVEN){
+          limitReached = true;
+          return users; // sin cambios: ya llegó al máximo de likes que puede dar
+        }
+        u.likes.push(liker);
+        likedNow = true;
+      }
       users[key] = u;
       return users;
     });
   }catch(err){
     console.error(err);
     showToast('Like konnte nicht gespeichert werden. Versuche es erneut.', 'error');
+    // Revertimos la UI optimista al último estado real conocido.
+    if(viewingProfile && viewingProfile.toLowerCase() === key) renderProfileView(usersCache[key] || userLookup(username));
+    if(currentView === 'discover' && discoverList[discoverIndex] && discoverList[discoverIndex].username.toLowerCase() === key) updateDiscoverLikeUI(discoverList[discoverIndex]);
     return;
   }
   usersCache = newUsers || usersCache;
@@ -3761,7 +3909,11 @@ async function toggleProfileLike(username){
     discoverList[discoverIndex] = usersCache[username.toLowerCase()] || discoverList[discoverIndex];
     updateDiscoverLikeUI(discoverList[discoverIndex]);
   }
-  showToast(likedNow ? 'Like gesendet! ❤️' : 'Like zurückgenommen.', 'success');
+  if(limitReached){
+    showToast(`Du kannst maximal ${MAX_LIKES_GIVEN} Likes gleichzeitig vergeben. Entferne zuerst einen Like, um einen neuen zu geben.`, 'error');
+  }else{
+    showToast(likedNow ? 'Like gesendet! ❤️' : 'Like zurückgenommen.', 'success');
+  }
 }
 
 // ---- Pantalla de descubrimiento a pantalla completa ----
@@ -3771,11 +3923,24 @@ async function toggleProfileLike(username){
 let discoverList = [];
 let discoverIndex = 0;
 
+// Si el usuario actual indicó su género (hombre/mujer), en "Descubrir" solo
+// le mostramos perfiles del género opuesto — igual que pidió: alguien
+// registrado como "hombre" ve perfiles de "mujeres", y viceversa. Los
+// perfiles sin género definido (cuentas antiguas, el admin antes de
+// completar el modal, o quien eligió "Divers") no se excluyen, para no
+// hacer desaparecer cuentas existentes de la lista.
+function oppositeGender(g){
+  if(g === 'male') return 'female';
+  if(g === 'female') return 'male';
+  return null; // "other"/sin definir: sin filtro de género
+}
 async function loadDiscoverList(){
   const users = await sGet('farol-users', true) || usersCache;
   usersCache = users;
+  const wanted = currentUser ? oppositeGender(currentUser.gender) : null;
   discoverList = Object.values(users)
     .filter(u => u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase()))
+    .filter(u => !wanted || !u.gender || u.gender === wanted)
     // Los perfiles con más likes aparecen primero, para que descubrir se
     // sienta vivo; en empate, orden alfabético estable.
     .sort((a, b) => {
@@ -3920,6 +4085,7 @@ function toggleProfileEdit(){
   document.getElementById('profile-edit-mode').classList.toggle('hidden', !editHidden);
   if(editHidden){
     document.getElementById('edit-bio').value = currentUser.bio || '';
+    document.getElementById('edit-gender').value = currentUser.gender || 'other';
     const s = currentUser.socials || {};
     document.getElementById('edit-telegram').value = s.telegram || '';
     document.getElementById('edit-whatsapp').value = s.whatsapp || '';
@@ -3954,6 +4120,7 @@ async function saveProfile(){
 
   const key = currentUser.username.toLowerCase();
   const newBio = document.getElementById('edit-bio').value.trim().slice(0, 220);
+  const newGender = document.getElementById('edit-gender').value;
   let u = null;
   try{
     // Transacción atómica: evita que este guardado pise (o sea pisado por)
@@ -3962,6 +4129,7 @@ async function saveProfile(){
       users = users || {};
       u = users[key] || currentUser;
       u.bio = newBio;
+      u.gender = newGender;
       u.socials = rawSocials;
       users[key] = u;
       return users;
@@ -3981,9 +4149,12 @@ async function handleAvatarFile(e){
   const file = e.target.files[0];
   if(!file) return;
   try{
-    // 220x220 y algo menos de calidad para que el documento propio del
-    // usuario (avatar + banner) se mantenga chico y liviano de transferir.
-    const dataUrl = await resizeImageFile(file, 220, 220, 0.72);
+    // La foto de perfil ya no se usa solo como miniatura circular chica:
+    // en "Descubrir" se muestra a pantalla completa, así que 220x220 se
+    // veía muy pixelada/borrosa ahí. Subimos resolución y calidad; el
+    // documento propio del avatar tiene su propio límite de 1MB en
+    // Firestore y a esta calidad se mantiene muy por debajo de eso.
+    const dataUrl = await resizeImageFile(file, 800, 800, 0.85);
     const key = currentUser.username.toLowerCase();
     const ok = await sSetCritical(avatarKey(currentUser.username), dataUrl, true);
     avatarCache[key] = dataUrl;
@@ -4246,8 +4417,12 @@ async function handleGalleryFile(e){
     // tenga el usuario. La miniatura se genera a 240x240 (antes 160x160,
     // con más calidad también) porque en pantallas retina/HiDPI 160px se
     // veía borrosa al mostrarse en una celda de ~150-160px de la grilla.
-    const fullDataUrl = await resizeImageFile(file, 900, 900, 0.8);
-    const thumbDataUrl = await resizeImageFile(file, 240, 240, 0.68);
+    // Foto completa (se ve grande en el visor/lightbox): más resolución y
+    // calidad para que no se vea pixelada al abrirla. Sigue en su propio
+    // documento de Firestore, así que el límite de 1MB no lo comparte con
+    // el resto de la galería.
+    const fullDataUrl = await resizeImageFile(file, 1280, 1280, 0.85);
+    const thumbDataUrl = await resizeImageFile(file, 320, 320, 0.75);
     const caption = (prompt('Schreibe eine Beschreibung für dein Foto (optional):', '') || '').slice(0, 140);
     const photoId = Date.now()+'-'+Math.random().toString(36).slice(2,7);
     const username = currentUser.username;
@@ -4385,18 +4560,35 @@ function renderLightbox(){
 
 async function toggleReaction(type){
   if(!currentUser || !currentLightboxPhotoId || !viewingProfile) return;
+  // Respuesta instantánea con lo que ya tenemos en memoria: togglear la
+  // reacción sobre currentGalleryPhotos y repintar de una, sin esperar el
+  // viaje de ida y vuelta a Firestore (que es lo que se sentía "lento").
+  const localP = currentGalleryPhotos.find(x => x.id === currentLightboxPhotoId);
+  if(localP){
+    const r = getReactions(localP);
+    const arr = r[type];
+    const idx = arr.indexOf(currentUser.username);
+    if(idx >= 0) arr.splice(idx, 1); else arr.push(currentUser.username);
+    renderLightbox();
+    renderGallery(currentGalleryPhotos);
+  }
   const key = galleryKey(viewingProfile);
-  const photos = await sGet(key, true) || currentGalleryPhotos;
-  const p = photos.find(x => x.id === currentLightboxPhotoId);
-  if(!p) return;
-  const reactions = getReactions(p);
-  const arr = reactions[type];
-  const idx = arr.indexOf(currentUser.username);
-  if(idx >= 0) arr.splice(idx, 1); else arr.push(currentUser.username);
-  await sSet(key, photos, true);
-  currentGalleryPhotos = photos;
+  try{
+    const photos = await sGet(key, true) || currentGalleryPhotos;
+    const p = photos.find(x => x.id === currentLightboxPhotoId);
+    if(!p){ currentGalleryPhotos = photos; return; }
+    const reactions = getReactions(p);
+    const arr = reactions[type];
+    const idx = arr.indexOf(currentUser.username);
+    if(idx >= 0) arr.splice(idx, 1); else arr.push(currentUser.username);
+    await sSet(key, photos, true);
+    currentGalleryPhotos = photos;
+  }catch(err){
+    console.error(err);
+    showToast('Reaktion konnte nicht gespeichert werden. Versuche es erneut.', 'error');
+  }
   renderLightbox();
-  renderGallery(photos);
+  renderGallery(currentGalleryPhotos);
 }
 
 
