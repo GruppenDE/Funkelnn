@@ -910,7 +910,23 @@
   .discover-full-name{
     font-family:'Fredoka';font-size:24px;font-weight:700;color:#fff;
     text-shadow:0 2px 10px rgba(0,0,0,.4);overflow-wrap:anywhere;
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap;
   }
+  /* Etiqueta "Neu hier" sobre la tarjeta de Descubrir: marca a quien se
+     registró después de la última vez que ESTE usuario abrió Descubrir.
+     Se calcula una sola vez por apertura (ver discoverNewSet en el JS), así
+     que la próxima vez que vuelva a abrir la pantalla ya no aparece. */
+  .discover-full-new-tag{
+    display:inline-flex;align-items:center;gap:4px;
+    background:linear-gradient(135deg,var(--accent-amber),var(--accent-violet));
+    color:#fff;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;
+    padding:3px 9px 3px 8px;border-radius:20px;letter-spacing:.2px;
+    box-shadow:0 3px 10px rgba(255,46,156,.4);white-space:nowrap;
+    animation:discoverNewPulse 1.8s ease-in-out infinite;
+  }
+  .discover-full-new-tag.hidden{display:none;}
+  @keyframes discoverNewPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+  @media (prefers-reduced-motion:reduce){ .discover-full-new-tag{animation:none;} }
   .discover-full-bio{
     font-size:13px;color:rgba(255,255,255,.88);margin-top:4px;max-height:40px;overflow:hidden;
     text-overflow:ellipsis;
@@ -1426,6 +1442,7 @@
         <div class="topbar-right">
           <button class="btn-icon online-toggle" id="lobby-discover-btn" onclick="openDiscoverView()" title="Mitglieder entdecken" aria-label="Mitglieder entdecken">
             <i class="fa-solid fa-heart"></i>
+            <span class="online-toggle-badge hidden" id="discover-new-badge" title="Neue Mitglieder">0</span>
           </button>
           <button class="btn-icon online-toggle" id="lobby-dm-btn" onclick="openPrivateChatsList()" title="Private Chats" aria-label="Private Chats">
             <i class="fa-solid fa-comment-dots"></i>
@@ -1492,7 +1509,10 @@
           <div class="discover-full-navzone discover-full-next" onclick="discoverNext()" title="Nächstes Profil"></div>
           <div class="discover-full-gradient"></div>
           <div class="discover-full-info">
-            <div class="discover-full-name" id="discover-full-name"></div>
+            <div class="discover-full-name">
+              <span id="discover-full-name"></span>
+              <span class="discover-full-new-tag hidden" id="discover-full-new-tag"><i class="fa-solid fa-sparkles"></i> Neu hier</span>
+            </div>
             <div class="discover-full-bio" id="discover-full-bio"></div>
           </div>
         </div>
@@ -3567,6 +3587,7 @@ async function poll(){
   await refreshUsersCache();
   refreshDmBadge();
   refreshPhotoCommentBadge();
+  refreshDiscoverNewBadge();
   if(currentView === 'lobby'){
     await renderLobby();
     return;
@@ -4513,6 +4534,52 @@ async function toggleProfileLike(username){
 // arrancar un chat privado gratuito directo desde ahí.
 let discoverList = [];
 let discoverIndex = 0;
+// Conjunto (nombres en minúscula) de perfiles que cuentan como "nuevos" para
+// ESTE usuario en la apertura actual de Descubrir. Se calcula una sola vez
+// al abrir la pantalla (comparando contra la marca de tiempo guardada la
+// última vez que la abrió) y no se vuelve a recalcular hasta la próxima
+// apertura — así la etiqueta "Neu hier" se muestra una única vez por
+// usuario nuevo, y no reaparece en visitas futuras.
+let discoverNewSet = new Set();
+
+// Guardamos, por cada cuenta que usa este navegador, la marca de tiempo de
+// la última vez que abrió la pantalla de Descubrir. Cualquier perfil cuyo
+// createdAt sea posterior a esa marca cuenta como "nuevo" para avisarle.
+function discoverLastSeenKey(){
+  return 'farol-discover-lastseen-' + (currentUser ? currentUser.username.toLowerCase() : 'guest');
+}
+function getDiscoverLastSeen(){
+  const key = discoverLastSeenKey();
+  let v = localStorage.getItem(key);
+  if(v === null){
+    // Primera vez que calculamos esto para esta cuenta: arrancamos "desde
+    // ahora", para no marcar como nuevos a todos los miembros que ya
+    // estaban registrados antes de que existiera este aviso.
+    v = Date.now();
+    localStorage.setItem(key, String(v));
+  }
+  return parseInt(v, 10) || 0;
+}
+function setDiscoverLastSeen(ts){
+  localStorage.setItem(discoverLastSeenKey(), String(ts));
+}
+
+// Recalcula, a partir de usersCache, cuántos miembros se registraron
+// después de la última vez que el usuario abrió Descubrir, y refleja ese
+// número como una insignia sobre el ícono del corazón (arriba, en el
+// lobby) — así los usuarios ya registrados saben que hay alguien nuevo
+// sin necesidad de entrar a la pantalla de Descubrir.
+function refreshDiscoverNewBadge(){
+  const badge = document.getElementById('discover-new-badge');
+  if(!badge || !currentUser) return;
+  const lastSeen = getDiscoverLastSeen();
+  const meLower = currentUser.username.toLowerCase();
+  const count = Object.values(usersCache || {})
+    .filter(u => u && u.username && u.username.toLowerCase() !== meLower && (u.createdAt || 0) > lastSeen)
+    .length;
+  badge.textContent = count > 99 ? '99+' : String(count);
+  badge.classList.toggle('hidden', count === 0);
+}
 
 // Si el usuario actual indicó su género (hombre/mujer), en "Descubrir" solo
 // le mostramos perfiles del género opuesto — igual que pidió: alguien
@@ -4550,9 +4617,24 @@ async function openDiscoverView(){
   document.getElementById('view-discover').classList.remove('hidden');
   document.getElementById('view-discover').classList.add('view-fade');
   currentView = 'discover';
+  // Tomamos la marca de "última vez visto" ANTES de refrescarla, para
+  // poder marcar como "nuevos" a quienes se registraron desde entonces.
+  const lastSeen = getDiscoverLastSeen();
   await loadDiscoverList();
+  const meLower = currentUser.username.toLowerCase();
+  discoverNewSet = new Set(
+    discoverList
+      .filter(u => u && (u.createdAt || 0) > lastSeen)
+      .map(u => u.username.toLowerCase())
+  );
   discoverIndex = 0;
   renderDiscoverCard();
+  // La insignia del corazón ya cumplió su función (avisar que había gente
+  // nueva); al entrar aquí queda "leída". Los perfiles marcados en
+  // discoverNewSet siguen mostrando "Neu hier" durante esta visita, pero no
+  // volverán a marcarse la próxima vez que se abra esta pantalla.
+  setDiscoverLastSeen(Date.now());
+  refreshDiscoverNewBadge();
 }
 
 function closeDiscoverView(){
@@ -4594,6 +4676,8 @@ function renderDiscoverCard(){
   counter.textContent = `${discoverIndex + 1} / ${discoverList.length}`;
   document.getElementById('discover-full-name').textContent = u.username;
   document.getElementById('discover-full-bio').textContent = u.bio || '';
+  const newTag = document.getElementById('discover-full-new-tag');
+  if(newTag) newTag.classList.toggle('hidden', !discoverNewSet.has(u.username.toLowerCase()));
   paintDiscoverPhoto(u.username);
   updateDiscoverLikeUI(u);
 }
