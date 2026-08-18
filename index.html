@@ -568,6 +568,16 @@
     border-radius:20px;padding:6px 12px;font-size:12.5px;color:var(--text-cream);text-decoration:none;
   }
   .social-chip:hover{border-color:var(--border-glow);}
+  .social-chip-icon{
+    width:20px;height:20px;border-radius:6px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .social-chip-icon svg{width:12px;height:12px;display:block;}
+  .social-chip[href*="t.me"] .social-chip-icon{background:#29A9EA;}
+  .social-chip[href*="wa.me"] .social-chip-icon{background:#25D366;}
+  .social-chip[href*="facebook.com"] .social-chip-icon{background:#1877F2;}
+  .social-chip[href*="instagram.com"] .social-chip-icon{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);}
+  .social-chip[href*="x.com"] .social-chip-icon{background:#000;}
   .social-empty{font-size:12.5px;color:var(--text-muted);}
 
   /* ---------- TOASTS ---------- */
@@ -2762,12 +2772,23 @@ let viewingProfile = null;      // username currently shown in the profile modal
 let currentGalleryPhotos = [];  // photos of viewingProfile
 let currentLightboxPhotoId = null;
 
+// Logos oficiales de cada red social en SVG, en blanco (fill="#fff"), para
+// que se vean nítidos a cualquier tamaño y con cualquier fondo del chip.
+// Son constantes fijas definidas en el código (no vienen de datos del
+// usuario), así que insertarlas vía innerHTML es seguro.
+const SOCIAL_ICONS = {
+  telegram: '<svg viewBox="0 0 496 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M248 8C111 8 0 119 0 256s111 248 248 248 248-111 248-248S385 8 248 8zM406.9 158.6l-46.4 218.8c-3.4 15.5-12.6 19.3-25.5 12l-70.4-51.9-33.9 32.7c-3.8 3.8-6.9 6.9-14.1 6.9l5-70.9L390.6 176c5.9-5.3-1.3-8.2-9.1-2.9L164.8 313.4l-70.4-22c-15.3-4.8-15.6-15.3 3.2-22.6l275.1-106c12.7-4.6 23.8 3 20.2 22z"/></svg>',
+  whatsapp: '<svg viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M380.9 97.1C339 55.1 283.2 32 224.3 32c-122.7 0-222.5 99.8-222.5 222.5 0 39.2 10.2 77.5 29.6 111.3L0 480l117.7-30.9c32.5 17.8 69.1 27.2 106.4 27.2h.1c122.7 0 222.5-99.8 222.5-222.5 0-59.4-23.1-115.3-65.8-156.7zM224.3 438.5h-.1c-33.1 0-65.6-8.9-93.9-25.7l-6.7-4-69.8 18.3 18.6-68-4.4-7c-18.3-29.2-28-62.7-28-97.2 0-100.7 82-182.7 183-182.7 48.9 0 94.8 19 129.6 53.9 34.7 34.8 53.9 80.9 53.9 129.9-.1 100.7-82.1 182.7-182.2 182.7zm100.1-136.9c-5.5-2.8-32.5-16-37.5-17.8-5-1.8-8.7-2.8-12.4 2.8-3.7 5.5-14.2 17.8-17.4 21.5-3.2 3.7-6.4 4.1-11.9 1.4-32.4-16.2-53.7-28.9-75.1-65.6-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.4-29.9-17-40.9-4.5-10.8-9.1-9.3-12.4-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5 5.5-19.4 19-19.4 46.3s19.9 53.7 22.6 57.4c2.8 3.7 39.1 59.7 94.8 83.7 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.5-13.3 37.1-26.1 4.6-12.8 4.6-23.8 3.2-26.1-1.3-2.5-5-4-10.6-6.9z"/></svg>',
+  facebook: '<svg viewBox="0 0 320 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"/></svg>',
+  instagram: '<svg viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"/></svg>',
+  twitter: '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z"/></svg>',
+};
 const SOCIAL_PLATFORMS = [
-  {key:'telegram',  label:'Telegram',  icon:'📨', build:v=> v.startsWith('http') ? v : `https://t.me/${v.replace('@','')}`},
-  {key:'whatsapp',  label:'WhatsApp',  icon:'💬', build:v=> v.startsWith('http') ? v : `https://wa.me/${v.replace(/\D/g,'')}`},
-  {key:'facebook',  label:'Facebook',  icon:'📘', build:v=> v.startsWith('http') ? v : `https://facebook.com/${v.replace('@','')}`},
-  {key:'instagram', label:'Instagram', icon:'📷', build:v=> v.startsWith('http') ? v : `https://instagram.com/${v.replace('@','')}`},
-  {key:'twitter',   label:'Twitter/X', icon:'🐦', build:v=> v.startsWith('http') ? v : `https://x.com/${v.replace('@','')}`},
+  {key:'telegram',  label:'Telegram',  icon:SOCIAL_ICONS.telegram,  build:v=> v.startsWith('http') ? v : `https://t.me/${v.replace('@','')}`},
+  {key:'whatsapp',  label:'WhatsApp',  icon:SOCIAL_ICONS.whatsapp,  build:v=> v.startsWith('http') ? v : `https://wa.me/${v.replace(/\D/g,'')}`},
+  {key:'facebook',  label:'Facebook',  icon:SOCIAL_ICONS.facebook,  build:v=> v.startsWith('http') ? v : `https://facebook.com/${v.replace('@','')}`},
+  {key:'instagram', label:'Instagram', icon:SOCIAL_ICONS.instagram, build:v=> v.startsWith('http') ? v : `https://instagram.com/${v.replace('@','')}`},
+  {key:'twitter',   label:'Twitter/X', icon:SOCIAL_ICONS.twitter,   build:v=> v.startsWith('http') ? v : `https://x.com/${v.replace('@','')}`},
 ];
 
 async function openProfile(username){
@@ -3214,7 +3235,7 @@ function renderSocials(socials){
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.className = 'social-chip';
-    a.innerHTML = `<span>${p.icon}</span>${p.label}`;
+    a.innerHTML = `<span class="social-chip-icon">${p.icon}</span>${p.label}`;
     row.appendChild(a);
   });
   if(!any){
