@@ -2173,6 +2173,29 @@ function fullnessLevel(pct){
   if(pct >= 35) return 'warm';
   return 'calm';
 }
+
+// Porcentaje "falso" y rotativo para la tarjeta especial (Chatte mit
+// Valeria): en vez de un 99% fijo, simula que va bajando y volviendo a
+// subir con el tiempo, como una sala real que se llena y se vacía.
+// Es una onda triangular determinística basada en la hora actual (no un
+// setInterval que cuenta desde que se abrió la página), así que:
+//  - Cambia de valor una vez por minuto (Math.floor(Date.now()/60000)).
+//  - Es la MISMA para todos los que tengan la página abierta en ese
+//    momento (dos personas viendo el lobby a la vez ven el mismo número),
+//    sin tener que sincronizar nada con el servidor.
+//  - Sube y baja en un ciclo suave entre VALERIA_PCT_MIN y VALERIA_PCT_MAX,
+//    en vez de saltar de golpe.
+const VALERIA_PCT_MIN = 58;
+const VALERIA_PCT_MAX = 99;
+const VALERIA_CYCLE_MINUTES = 14; // 7 min bajando + 7 min subiendo, y se repite
+function valeriaPct(){
+  const period = VALERIA_CYCLE_MINUTES;
+  const half = period / 2;
+  const slot = Math.floor(Date.now() / 60000) % period; // 0..period-1, un paso por minuto
+  const dist = Math.min(slot, period - slot); // 0 en el pico (99%), half en el valle
+  const t = dist / half; // 0 = pico, 1 = valle
+  return Math.round(VALERIA_PCT_MAX - t * (VALERIA_PCT_MAX - VALERIA_PCT_MIN));
+}
 // Últimos datos de "en línea" que conocemos, para poder pintar el lobby al
 // instante (sin esperar a Firestore) usando el dato más reciente disponible.
 let lastOnlineSnapshot = {};
@@ -2207,10 +2230,13 @@ function paintLobbyGrid(online){
     const card = document.createElement('div');
     card.className = 'lobby-card' + (isFirstPaint ? ' reveal' : '') + (r.special ? ' is-special' : '');
     if(isFirstPaint) card.style.animationDelay = (i * 0.06) + 's';
+    if(r.special) card.dataset.special = '1';
     // Las tarjetas con "link" son botones de enlace externo: no entran a
     // una sala de chat, solo redirigen a la URL indicada en una pestaña nueva.
     card.onclick = r.link ? (() => window.open(r.link, '_blank', 'noopener')) : (() => enterRoom(r.id));
 
+    const vPct = r.link ? valeriaPct() : 0;
+    const vLevel = r.link ? fullnessLevel(vPct) : '';
     card.innerHTML = r.link ? `
       <div class="lobby-card-top">
         <div class="lobby-emoji">${roomIconHtml(r)}</div>
@@ -2219,10 +2245,10 @@ function paintLobbyGrid(online){
       <div class="lobby-card-name">${r.name}</div>
       <div class="lobby-card-desc">${r.desc}</div>
       <div class="lobby-meter">
-        <div class="lobby-meter-fill level-hot" style="width:99%"></div>
+        <div class="lobby-meter-fill level-${vLevel}" style="width:${vPct}%"></div>
       </div>
       <div class="lobby-meter-row">
-        <span class="lobby-pct level-hot">99% voll</span>
+        <span class="lobby-pct level-${vLevel}">${vPct}% voll</span>
         <span class="lobby-enter">Öffnen →</span>
       </div>` : `
       <div class="lobby-card-top">
@@ -2242,6 +2268,23 @@ function paintLobbyGrid(online){
   });
   grid.dataset.painted = '1';
 }
+
+// Refresca SOLO la tarjeta especial (Chatte mit Valeria) con el nuevo
+// porcentaje, sin tocar el resto del lobby ni reiniciar sus animaciones.
+// Se llama cada minuto de fondo, tanto si el lobby está visible en ese
+// momento como si no (así, cuando la persona vuelva a mirarlo, el número
+// ya está al día en vez de mostrar el valor viejo hasta el próximo repaint).
+function updateValeriaCardMeter(){
+  const card = document.querySelector('.lobby-card[data-special="1"]');
+  if(!card) return;
+  const pct = valeriaPct();
+  const level = fullnessLevel(pct);
+  const fill = card.querySelector('.lobby-meter-fill');
+  const label = card.querySelector('.lobby-pct');
+  if(fill){ fill.style.width = pct + '%'; fill.className = 'lobby-meter-fill level-' + level; }
+  if(label){ label.textContent = pct + '% voll'; label.className = 'lobby-pct level-' + level; }
+}
+setInterval(updateValeriaCardMeter, 60000);
 
 async function enterRoom(id){
   document.getElementById('view-lobby').classList.add('hidden');
