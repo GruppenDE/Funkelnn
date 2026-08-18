@@ -803,46 +803,78 @@
   .lobby-hero p{color:var(--text-muted);font-size:14.5px;margin:0;}
   .lobby-hero p span{color:var(--accent-mint);font-weight:700;}
 
-  /* ===== Discover members (avatars, likes, chat gratis) ===== */
-  .discover-section{max-width:1160px;width:100%;margin:0 auto 30px;animation:fadeInUp .5s ease both;}
-  .discover-header{padding:0 2px;margin-bottom:12px;}
-  .discover-header h2{
-    font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px;font-weight:600;
+  /* ===== DISCOVER (pantalla completa, estilo Knuddels): foto de perfil,
+     like y chat privado gratis, un perfil a la vez ===== */
+  #view-discover{
+    height:100vh;height:100dvh;width:100vw;background:var(--bg-void);
+    display:flex;justify-content:center;
   }
-  .discover-header h2 i{color:var(--accent-coral);font-size:15px;}
-  .discover-header p{margin:0;color:var(--text-muted);font-size:13px;}
-  .discover-scroll{
-    display:flex;gap:12px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity;
+  .discover-full-wrap{
+    width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;
+    padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));box-sizing:border-box;
   }
-  .discover-card{
-    flex:0 0 auto;width:128px;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);
-    border-radius:var(--radius-md);padding:14px 10px 12px;text-align:center;scroll-snap-align:start;
-    display:flex;flex-direction:column;align-items:center;gap:8px;
+  .discover-full-topbar{
+    display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;padding-bottom:10px;
   }
-  .discover-avatar{width:70px;height:70px;font-size:22px;border:3px solid var(--bg-card-2);}
-  .discover-name{
-    font-size:12.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;
-    white-space:nowrap;
+  .discover-full-close{
+    background:rgba(255,255,255,.08);border-radius:50%;width:38px;height:38px;
+    display:flex;align-items:center;justify-content:center;font-size:16px;
   }
-  .discover-actions{display:flex;gap:6px;width:100%;}
-  .discover-like-btn{
-    flex:1;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg-void);
-    border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:7px 4px;font-size:11.5px;
-    color:var(--text-cream);cursor:pointer;font-family:'Inter',sans-serif;min-width:0;
+  .discover-full-counter{font-size:13px;color:var(--text-muted);font-weight:600;}
+  .discover-full-card{
+    flex:1;min-height:0;border-radius:var(--radius-lg);overflow:hidden;position:relative;
+    box-shadow:0 20px 50px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);
   }
-  .discover-like-btn i{font-size:12px;color:var(--text-muted);}
-  .discover-like-btn.liked{border-color:rgba(255,61,107,.5);background:rgba(255,61,107,.1);}
-  .discover-like-btn.liked i{color:var(--accent-coral);}
-  .discover-chat-btn{
-    flex:0 0 auto;width:32px;height:32px;border-radius:10px;background:var(--accent-amber);
-    color:#2b0618;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;font-size:12.5px;
+  .discover-full-card.hidden{display:none;}
+  .discover-full-photo{
+    position:absolute;inset:0;background-size:cover;background-position:center;
+    background-color:var(--bg-card-2);
   }
-  .discover-chat-btn:hover{filter:brightness(1.08);}
-  .discover-empty{color:var(--text-muted);font-size:13px;padding:10px 4px;}
+  .discover-full-initials{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:'Fredoka';font-size:88px;font-weight:700;color:rgba(255,255,255,.9);pointer-events:none;
+  }
+  .discover-full-navzone{position:absolute;top:0;bottom:130px;width:38%;}
+  .discover-full-prev{left:0;}
+  .discover-full-next{right:0;}
+  .discover-full-gradient{
+    position:absolute;left:0;right:0;bottom:0;height:42%;
+    background:linear-gradient(180deg,transparent,rgba(8,8,20,.94));pointer-events:none;
+  }
+  .discover-full-info{position:absolute;left:18px;right:18px;bottom:16px;pointer-events:none;}
+  .discover-full-name{
+    font-family:'Fredoka';font-size:24px;font-weight:700;color:#fff;
+    text-shadow:0 2px 10px rgba(0,0,0,.4);overflow-wrap:anywhere;
+  }
+  .discover-full-bio{
+    font-size:13px;color:rgba(255,255,255,.88);margin-top:4px;max-height:40px;overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .discover-full-actions{
+    display:flex;align-items:center;justify-content:center;gap:22px;flex:0 0 auto;padding:16px 0 4px;
+  }
+  .discover-full-actions.hidden{display:none;}
+  .discover-full-btn{
+    border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    background:var(--bg-card);color:var(--text-cream);box-shadow:0 6px 16px rgba(0,0,0,.3);
+  }
+  .discover-full-skip{width:52px;height:52px;font-size:18px;color:var(--text-muted);}
+  .discover-full-like{
+    width:66px;height:66px;flex-direction:column;gap:2px;border:2px solid transparent;
+  }
+  .discover-full-like i{font-size:24px;color:var(--text-muted);}
+  .discover-full-like span{font-size:11px;font-weight:700;color:var(--text-muted);}
+  .discover-full-like.liked{border-color:rgba(255,61,107,.5);}
+  .discover-full-like.liked i,.discover-full-like.liked span{color:var(--accent-coral);}
+  .discover-full-chat{width:56px;height:56px;font-size:20px;background:var(--accent-amber);color:#2b0618;}
+  .discover-full-empty{margin:auto;color:var(--text-muted);font-size:14px;text-align:center;padding:40px 20px;}
+  .discover-full-empty.hidden{display:none;}
   @media (max-width:480px){
-    .discover-card{width:112px;padding:12px 8px 10px;}
-    .discover-avatar{width:60px;height:60px;font-size:19px;}
+    .discover-full-name{font-size:21px;}
+    .discover-full-initials{font-size:68px;}
+    .discover-full-btn.discover-full-like{width:60px;height:60px;}
   }
+
 
   .lobby-grid{
     max-width:1160px;width:100%;margin:0 auto;
@@ -1229,6 +1261,9 @@
           </div>
         </div>
         <div class="topbar-right">
+          <button class="btn-icon online-toggle" id="lobby-discover-btn" onclick="openDiscoverView()" title="Mitglieder entdecken" aria-label="Mitglieder entdecken">
+            <i class="fa-solid fa-heart"></i>
+          </button>
           <button class="btn-icon online-toggle" id="lobby-dm-btn" onclick="openPrivateChatsList()" title="Private Chats" aria-label="Private Chats">
             <i class="fa-solid fa-comment-dots"></i>
             <span class="online-toggle-badge" id="dm-list-badge-lobby">0</span>
@@ -1253,17 +1288,6 @@
         <p>Das sind die aktiven Plätze gerade jetzt. <span id="lobby-total-online">0</span> Personen sind bei Funkeln verbunden.</p>
       </div>
 
-      <!-- ===================== DISCOVER MEMBERS (Likes + Free DM) ===================== -->
-      <div class="discover-section" id="discover-section">
-        <div class="discover-header">
-          <h2><i class="fa-solid fa-heart"></i> Entdecke Mitglieder</h2>
-          <p>Gib ein Like, wenn dir jemand gefällt, oder schreib direkt einen kostenlosen privaten Chat.</p>
-        </div>
-        <div class="discover-scroll" id="discover-scroll">
-          <div class="discover-empty">Lade Mitglieder…</div>
-        </div>
-      </div>
-
       <div class="lobby-grid" id="lobby-grid" data-painted="0"></div>
 
       <!-- ===================== APP FOOTER (simple) ===================== -->
@@ -1281,6 +1305,47 @@
         </div>
         <p class="app-footer-copy">&copy; <span id="app-footer-year"></span> Funkeln</p>
       </footer>
+    </div>
+  </div>
+
+  <!-- ===================== DISCOVER VIEW (pantalla completa, estilo Knuddels) ===================== -->
+  <div id="view-discover" class="hidden">
+    <div class="discover-full-wrap">
+      <div class="discover-full-topbar">
+        <button type="button" class="btn-icon discover-full-close" onclick="closeDiscoverView()" title="Zu den Räumen" aria-label="Schließen">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="discover-full-counter" id="discover-full-counter"></div>
+        <span style="width:38px;"></span>
+      </div>
+
+      <div class="discover-full-card" id="discover-full-card">
+        <div class="discover-full-photo" id="discover-full-photo">
+          <div class="discover-full-initials" id="discover-full-initials"></div>
+          <div class="discover-full-navzone discover-full-prev" onclick="discoverPrev()" title="Vorheriges Profil"></div>
+          <div class="discover-full-navzone discover-full-next" onclick="discoverNext()" title="Nächstes Profil"></div>
+          <div class="discover-full-gradient"></div>
+          <div class="discover-full-info">
+            <div class="discover-full-name" id="discover-full-name"></div>
+            <div class="discover-full-bio" id="discover-full-bio"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="discover-full-empty hidden" id="discover-full-empty">Noch keine anderen Mitglieder registriert.</div>
+
+      <div class="discover-full-actions" id="discover-full-actions">
+        <button type="button" class="discover-full-btn discover-full-skip" onclick="discoverNext()" title="Nächstes Profil" aria-label="Nächstes Profil">
+          <i class="fa-solid fa-forward"></i>
+        </button>
+        <button type="button" class="discover-full-btn discover-full-like" id="discover-full-like-btn" onclick="discoverToggleLike()" title="Like geben" aria-label="Like geben">
+          <i class="fa-solid fa-heart"></i>
+          <span id="discover-full-like-count">0</span>
+        </button>
+        <button type="button" class="discover-full-btn discover-full-chat" onclick="discoverStartChat()" title="Kostenloser privater Chat" aria-label="Privater Chat">
+          <i class="fa-solid fa-comment-dots"></i>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2246,8 +2311,11 @@ async function showChat(){
   startHeartbeat();
   startDmRealtime();
   await renderLobby();
-  renderDiscover();
   startPolling();
+  // Pantalla de descubrimiento a pantalla completa (foto + like + chat
+  // privado gratis), al estilo Knuddels: se muestra automáticamente cada
+  // vez que se entra a la app; el usuario la cierra (✕) para ir al lobby.
+  openDiscoverView();
 }
 
 /* ---------------- LOBBY ---------------- */
@@ -2382,6 +2450,7 @@ setInterval(updateValeriaCardMeter, 60000);
 
 async function enterRoom(id){
   document.getElementById('view-lobby').classList.add('hidden');
+  document.getElementById('view-discover').classList.add('hidden');
   document.getElementById('view-chat').classList.remove('hidden');
   document.getElementById('view-chat').classList.add('view-fade');
   currentView = 'chat';
@@ -2399,7 +2468,6 @@ async function backToLobby(){
   closeSidebars();
   document.getElementById('lobby-grid').dataset.painted = '0';
   await renderLobby();
-  renderDiscover();
 }
 function refreshMyAvatarUI(){
   const el = document.getElementById('me-avatar');
@@ -2602,6 +2670,7 @@ async function logout(){
   currentView = 'lobby';
   document.getElementById('view-lobby').classList.add('hidden');
   document.getElementById('view-chat').classList.add('hidden');
+  document.getElementById('view-discover').classList.add('hidden');
   showAuth();
 }
 
@@ -3074,9 +3143,9 @@ async function poll(){
   refreshDmBadge();
   if(currentView === 'lobby'){
     await renderLobby();
-    renderDiscover();
     return;
   }
+  if(currentView === 'discover') return;
   await loadMessages();
   await renderOnline();
 }
@@ -3532,6 +3601,7 @@ async function openDirectChat(otherUsername){
   closeSidebars();
 
   document.getElementById('view-lobby').classList.add('hidden');
+  document.getElementById('view-discover').classList.add('hidden');
   document.getElementById('view-chat').classList.remove('hidden');
   document.getElementById('view-chat').classList.add('view-fade');
   currentView = 'chat';
@@ -3568,6 +3638,7 @@ async function openDirectChatByUsers(userA, userB){
   closeSidebars();
 
   document.getElementById('view-lobby').classList.add('hidden');
+  document.getElementById('view-discover').classList.add('hidden');
   document.getElementById('view-chat').classList.remove('hidden');
   document.getElementById('view-chat').classList.add('view-fade');
   currentView = 'chat';
@@ -3646,7 +3717,7 @@ function renderProfileView(u){
   renderSocials(u.socials || {});
 }
 
-/* ================= LIKES + DISCOVER MEMBERS ================= */
+/* ================= LIKES + DISCOVER (pantalla completa, estilo Knuddels) ================= */
 // Da o quita un like al perfil de "username". Los likes se guardan como un
 // array de nombres de usuario dentro del propio registro en el documento
 // compartido "farol-users" (u.likes), usando una transacción atómica para
@@ -3679,74 +3750,145 @@ async function toggleProfileLike(username){
     return;
   }
   usersCache = newUsers || usersCache;
-  renderDiscover();
+  // Si el perfil abierto (modal) es el mismo, refrescamos su chip de likes.
   if(viewingProfile && viewingProfile.toLowerCase() === username.toLowerCase()){
     renderProfileView(usersCache[username.toLowerCase()] || userLookup(username));
+  }
+  // Si la pantalla de descubrimiento está abierta mostrando este mismo
+  // perfil, refrescamos su corazón/contador sin recargar toda la tarjeta.
+  if(currentView === 'discover' && discoverList[discoverIndex] &&
+     discoverList[discoverIndex].username.toLowerCase() === username.toLowerCase()){
+    discoverList[discoverIndex] = usersCache[username.toLowerCase()] || discoverList[discoverIndex];
+    updateDiscoverLikeUI(discoverList[discoverIndex]);
   }
   showToast(likedNow ? 'Like gesendet! ❤️' : 'Like zurückgenommen.', 'success');
 }
 
-// Tira horizontal de miembros registrados que se ve apenas se entra a la
-// app (dentro del lobby): foto de perfil, botón de Like con contador, y un
-// botón de chat privado gratuito directo (sin pasar por el perfil).
-async function renderDiscover(){
-  const scroll = document.getElementById('discover-scroll');
-  if(!scroll) return;
+// ---- Pantalla de descubrimiento a pantalla completa ----
+// Un perfil a la vez, con su foto ocupando toda la tarjeta, como en apps
+// tipo Knuddels: deslizar/tocar para pasar al siguiente, dar Like, o
+// arrancar un chat privado gratuito directo desde ahí.
+let discoverList = [];
+let discoverIndex = 0;
+
+async function loadDiscoverList(){
   const users = await sGet('farol-users', true) || usersCache;
   usersCache = users;
+  discoverList = Object.values(users)
+    .filter(u => u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase()))
+    // Los perfiles con más likes aparecen primero, para que descubrir se
+    // sienta vivo; en empate, orden alfabético estable.
+    .sort((a, b) => {
+      const diff = (b.likes || []).length - (a.likes || []).length;
+      return diff !== 0 ? diff : a.username.localeCompare(b.username);
+    });
+}
 
-  let list = Object.values(users).filter(u =>
-    u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase())
-  );
-  // Más likeados primero, para que el descubrimiento se sienta vivo; empate
-  // se resuelve alfabéticamente para que el orden no salte en cada poll.
-  list.sort((a, b) => {
-    const diff = (b.likes || []).length - (a.likes || []).length;
-    return diff !== 0 ? diff : a.username.localeCompare(b.username);
-  });
+async function openDiscoverView(){
+  if(!currentUser) return;
+  document.getElementById('view-lobby').classList.add('hidden');
+  document.getElementById('view-chat').classList.add('hidden');
+  document.getElementById('view-discover').classList.remove('hidden');
+  document.getElementById('view-discover').classList.add('view-fade');
+  currentView = 'discover';
+  await loadDiscoverList();
+  discoverIndex = 0;
+  renderDiscoverCard();
+}
 
-  scroll.innerHTML = '';
-  if(!list.length){
-    scroll.innerHTML = '<div class="discover-empty">Noch keine anderen Mitglieder registriert.</div>';
+function closeDiscoverView(){
+  document.getElementById('view-discover').classList.add('hidden');
+  document.getElementById('view-lobby').classList.remove('hidden');
+  document.getElementById('view-lobby').classList.add('view-fade');
+  currentView = 'lobby';
+}
+
+function discoverNext(){
+  if(!discoverList.length) return;
+  discoverIndex = (discoverIndex + 1) % discoverList.length;
+  renderDiscoverCard();
+}
+function discoverPrev(){
+  if(!discoverList.length) return;
+  discoverIndex = (discoverIndex - 1 + discoverList.length) % discoverList.length;
+  renderDiscoverCard();
+}
+
+function renderDiscoverCard(){
+  const card = document.getElementById('discover-full-card');
+  const actions = document.getElementById('discover-full-actions');
+  const empty = document.getElementById('discover-full-empty');
+  const counter = document.getElementById('discover-full-counter');
+
+  if(!discoverList.length){
+    card.classList.add('hidden');
+    actions.classList.add('hidden');
+    empty.classList.remove('hidden');
+    counter.textContent = '';
     return;
   }
-  list.forEach(u => {
-    const card = document.createElement('div');
-    card.className = 'discover-card';
+  card.classList.remove('hidden');
+  actions.classList.remove('hidden');
+  empty.classList.add('hidden');
 
-    card.appendChild(buildAvatarEl(u.username, 'discover-avatar'));
+  const u = discoverList[discoverIndex];
+  counter.textContent = `${discoverIndex + 1} / ${discoverList.length}`;
+  document.getElementById('discover-full-name').textContent = u.username;
+  document.getElementById('discover-full-bio').textContent = u.bio || '';
+  paintDiscoverPhoto(u.username);
+  updateDiscoverLikeUI(u);
+}
 
-    const name = document.createElement('div');
-    name.className = 'discover-name';
-    name.textContent = u.username;
-    name.title = u.username;
-    card.appendChild(name);
+function updateDiscoverLikeUI(u){
+  const likes = Array.isArray(u.likes) ? u.likes : [];
+  const iLiked = !!(currentUser && likes.some(l => l.toLowerCase() === currentUser.username.toLowerCase()));
+  const btn = document.getElementById('discover-full-like-btn');
+  btn.classList.toggle('liked', iLiked);
+  btn.title = iLiked ? 'Like entfernen' : 'Like geben';
+  document.getElementById('discover-full-like-count').textContent = likes.length;
+}
 
-    const actions = document.createElement('div');
-    actions.className = 'discover-actions';
+// Pinta la foto de perfil grande de la tarjeta: usa lo que ya tengamos en
+// caché/localStorage al instante (sin parpadeo), y confirma/actualiza con
+// Firestore en segundo plano — mismo patrón que applyAvatarStyle, pero
+// mostrando el resultado a pantalla completa en vez de en un círculo chico.
+async function paintDiscoverPhoto(username){
+  const key = username.toLowerCase();
+  function paint(url){
+    const photo = document.getElementById('discover-full-photo');
+    const initialsEl = document.getElementById('discover-full-initials');
+    if(url){
+      photo.style.backgroundImage = `url(${url})`;
+      photo.style.backgroundColor = '';
+      initialsEl.textContent = '';
+    }else{
+      photo.style.backgroundImage = 'none';
+      photo.style.backgroundColor = userLookup(username).color || colorFor(username);
+      initialsEl.textContent = initials(username);
+    }
+  }
+  let known = (avatarCache[key] !== undefined) ? avatarCache[key] : (userLookup(username).avatar || getLocalAvatarCache(key));
+  paint(known);
+  if(avatarCache[key] === undefined){
+    try{
+      const val = await sGet(avatarKey(username), true);
+      avatarCache[key] = val || null;
+      setLocalAvatarCache(key, val || null);
+      // Solo repintamos si la tarjeta sigue mostrando a esta misma persona
+      // (el usuario pudo haber pasado a la siguiente mientras cargaba).
+      const current = discoverList[discoverIndex];
+      if(current && current.username.toLowerCase() === key) paint(val);
+    }catch(e){}
+  }
+}
 
-    const likes = Array.isArray(u.likes) ? u.likes : [];
-    const iLiked = currentUser && likes.some(l => l.toLowerCase() === currentUser.username.toLowerCase());
-    const likeBtn = document.createElement('button');
-    likeBtn.type = 'button';
-    likeBtn.className = 'discover-like-btn' + (iLiked ? ' liked' : '');
-    likeBtn.title = iLiked ? 'Like entfernen' : 'Like geben';
-    likeBtn.innerHTML = `<i class="fa-solid fa-heart"></i> ${likes.length}`;
-    likeBtn.onclick = () => toggleProfileLike(u.username);
-    actions.appendChild(likeBtn);
-
-    const chatBtn = document.createElement('button');
-    chatBtn.type = 'button';
-    chatBtn.className = 'discover-chat-btn';
-    chatBtn.title = 'Kostenloser privater Chat';
-    chatBtn.setAttribute('aria-label', 'Privater Chat starten');
-    chatBtn.innerHTML = '<i class="fa-solid fa-comment-dots"></i>';
-    chatBtn.onclick = () => openDirectChat(u.username);
-    actions.appendChild(chatBtn);
-
-    card.appendChild(actions);
-    scroll.appendChild(card);
-  });
+function discoverToggleLike(){
+  if(!discoverList.length) return;
+  toggleProfileLike(discoverList[discoverIndex].username);
+}
+function discoverStartChat(){
+  if(!discoverList.length) return;
+  openDirectChat(discoverList[discoverIndex].username);
 }
 
 function renderSocials(socials){
