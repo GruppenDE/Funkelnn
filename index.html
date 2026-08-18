@@ -2442,7 +2442,8 @@ async function loadAdminUser(){
       return Object.assign(base, {
         bio: saved.bio, socials: saved.socials, gender: saved.gender,
         avatar: saved.avatar, banner: saved.banner,
-        bannerPos: saved.bannerPos, bannerZoom: saved.bannerZoom
+        bannerPos: saved.bannerPos, bannerZoom: saved.bannerZoom,
+        likes: saved.likes
       });
     }
   }catch(e){
