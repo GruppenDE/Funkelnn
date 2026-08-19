@@ -718,6 +718,19 @@
     0%{background-position:0% 0%;}
     100%{background-position:200% 0%;}
   }
+  /* La estrella del badge, aparte: más grande que el texto "ADMIN" y con
+     su propio brillo pulsante + giro sutil, para que salte a la vista de
+     inmediato en vez de perderse como un simple emoji chico. */
+  .admin-star{
+    display:inline-block;font-size:15px;line-height:1;
+    filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 6px #FFD54A);
+    animation:ownerStarPop 1.8s ease-in-out infinite;
+    transform-origin:center;
+  }
+  @keyframes ownerStarPop{
+    0%,100%{transform:scale(1) rotate(0deg); filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 6px #FFD54A);}
+    50%{transform:scale(1.35) rotate(14deg); filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 11px #FF9F4A);}
+  }
   /* Partículas doradas que titilan (aparecen/desaparecen) sobre el avatar
      y las esquinas del banner — como polvo mágico, distinto del barrido
      diagonal anterior. Las inserta renderOwnerSparkles() por JS. */
@@ -768,6 +781,7 @@
   @media (prefers-reduced-motion: reduce){
     .profile-panel.owner-profile #profile-avatar-wrap::before,
     .admin-badge,
+    .admin-star,
     .owner-sparkle,
     .social-chip.owner-shine{
       animation:none !important;
@@ -4654,7 +4668,7 @@ function closeProfile(){
 
 function renderProfileView(u){
   document.getElementById('profile-name').innerHTML = u.isAdmin
-    ? `${u.username} <span class="admin-badge">⭐ADMIN</span>`
+    ? `${u.username} <span class="admin-badge"><span class="admin-star">⭐</span>ADMIN</span>`
     : u.username;
   document.getElementById('profile-handle').textContent = '@' + u.username.toLowerCase();
   document.getElementById('profile-bio').textContent = u.bio || 'Es wurde noch keine Biografie geschrieben.';
