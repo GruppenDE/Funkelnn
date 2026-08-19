@@ -682,91 +682,71 @@
   .social-chip.ic-snapchat:hover{background:#FFFC00;}
   .social-empty{font-size:12.5px;color:var(--text-muted);}
 
-  /* ---------- PERFIL ADMIN (dueño de la página): brillos y animaciones ----------
-     Se activa agregando la clase .owner-profile al panel de perfil (ver
-     renderProfileView) SOLO cuando u.isAdmin es true, para que se note a
-     simple vista quién es el dueño de la página sin tocar el layout de los
-     perfiles normales. */
+  /* ---------- PERFIL ADMIN (dueño de la página): efecto "polvo mágico" ----------
+     Se activa con la clase .owner-profile en el panel (ver renderProfileView)
+     SOLO cuando u.isAdmin es true. En vez del borde animado + destello
+     diagonal de antes, ahora es: partículas doradas que titilan alrededor
+     del avatar y el banner, un aura suave detrás del avatar, y el nombre
+     con un brillo de texto sutil — más discreto y distinto al efecto
+     anterior. */
   .profile-panel.owner-profile{
-    position:relative;
-    border:1px solid transparent;
-    background:
-      linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
-      linear-gradient(120deg,#FFD54A,#FF9F4A,#FF2E9C,#B983FF,#FFD54A) border-box;
-    background-size:100% 100%, 300% 300%;
-    animation:ownerBorderFlow 6s ease infinite;
-    box-shadow:0 0 0 1px rgba(255,213,74,.15), 0 12px 40px -8px rgba(255,159,74,.35);
+    box-shadow:0 0 0 1px rgba(255,213,74,.18), 0 10px 30px -10px rgba(255,159,74,.3);
   }
-  @keyframes ownerBorderFlow{
-    0%{background-position:0% 0%, 0% 50%;}
-    50%{background-position:0% 0%, 100% 50%;}
-    100%{background-position:0% 0%, 0% 50%;}
-  }
-  /* Barrido de brillo diagonal sobre el banner, como un reflejo de luz que
-     pasa de vez en cuando — sutil, no un parpadeo constante. */
-  .profile-panel.owner-profile .profile-banner::after{
+  /* Aura suave detrás del avatar: un resplandor que respira lento, sin
+     anillo duro alrededor. */
+  .profile-panel.owner-profile #profile-avatar-wrap::before{
     content:'';
-    position:absolute;inset:0;pointer-events:none;
-    background:linear-gradient(115deg, transparent 40%, rgba(255,255,255,.35) 50%, transparent 60%);
-    background-size:250% 250%;
-    background-position:-100% -100%;
-    will-change:background-position;
-    animation:ownerBannerShine 5s ease-in-out infinite;
-    animation-delay:1s;
+    position:absolute;inset:-16px;border-radius:50%;
+    background:radial-gradient(circle, rgba(255,213,74,.5), transparent 70%);
+    filter:blur(7px);
+    z-index:0;
+    will-change:opacity, transform;
+    animation:ownerAuraBreathe 3.2s ease-in-out infinite;
   }
-  @keyframes ownerBannerShine{
-    0%{background-position:-100% -100%;}
-    35%,100%{background-position:150% 150%;}
+  .profile-panel.owner-profile .profile-avatar{position:relative;z-index:1;}
+  @keyframes ownerAuraBreathe{
+    0%,100%{opacity:.5;transform:scale(1);}
+    50%{opacity:.95;transform:scale(1.15);}
   }
-  /* Anillo dorado pulsante alrededor del avatar del dueño. */
-  .profile-panel.owner-profile .profile-avatar{
-    box-shadow:0 0 0 4px var(--bg-card), 0 0 0 7px #FFD54A, 0 0 18px 4px rgba(255,213,74,.55);
-    animation:ownerAvatarPulse 2.6s ease-in-out infinite;
+  /* Nombre del dueño: el badge ⭐ADMIN brilla con un degradado que se
+     desliza suavemente, en vez de todo el borde del panel animando. */
+  .admin-badge{
+    background-size:200% 100%;
+    animation:ownerBadgeShimmer 3.5s linear infinite;
   }
-  @keyframes ownerAvatarPulse{
-    0%,100%{box-shadow:0 0 0 4px var(--bg-card), 0 0 0 7px #FFD54A, 0 0 18px 4px rgba(255,213,74,.55);}
-    50%{box-shadow:0 0 0 4px var(--bg-card), 0 0 0 7px #FF9F4A, 0 0 26px 8px rgba(255,159,74,.75);}
+  @keyframes ownerBadgeShimmer{
+    0%{background-position:0% 0%;}
+    100%{background-position:200% 0%;}
   }
-  /* Redes sociales del dueño: cada chip brilla con un contorno dorado y un
-     destello que las recorre en cadena, para que resalten sin ser
-     estridentes. */
+  /* Partículas doradas que titilan (aparecen/desaparecen) sobre el avatar
+     y las esquinas del banner — como polvo mágico, distinto del barrido
+     diagonal anterior. Las inserta renderOwnerSparkles() por JS. */
+  .owner-sparkle{
+    position:absolute;pointer-events:none;border-radius:50%;
+    background:radial-gradient(circle, #fff 0%, #FFD54A 45%, transparent 75%);
+    opacity:0;z-index:2;
+    will-change:opacity, transform;
+    animation:ownerTwinkle 2.2s ease-in-out infinite;
+  }
+  @keyframes ownerTwinkle{
+    0%,100%{opacity:0;transform:scale(.3);}
+    50%{opacity:1;transform:scale(1);}
+  }
+  /* Redes sociales del dueño: solo un resplandor dorado que pulsa
+     suavemente, sin barrido de luz cruzando el ícono. */
   .social-chip.owner-shine{
-    position:relative;overflow:hidden;
     border-color:rgba(255,213,74,.55);
-    box-shadow:0 0 10px 1px rgba(255,213,74,.35);
-    animation:ownerChipGlow 2.6s ease-in-out infinite;
-  }
-  .social-chip.owner-shine::before{
-    content:'';
-    position:absolute;top:0;left:-40%;width:40%;height:100%;
-    background:linear-gradient(115deg, transparent, rgba(255,255,255,.55), transparent);
-    transform:skewX(-20deg) translateX(0%);
-    will-change:transform;
-    animation:ownerChipSweep 3.2s ease-in-out infinite;
+    animation:ownerChipGlow 2.8s ease-in-out infinite;
   }
   @keyframes ownerChipGlow{
-    0%,100%{box-shadow:0 0 10px 1px rgba(255,213,74,.35);}
-    50%{box-shadow:0 0 16px 3px rgba(255,159,74,.6);}
+    0%,100%{box-shadow:0 0 8px 0 rgba(255,213,74,.3);}
+    50%{box-shadow:0 0 14px 2px rgba(255,159,74,.55);}
   }
-  @keyframes ownerChipSweep{
-    0%{transform:skewX(-20deg) translateX(0%);}
-    45%,100%{transform:skewX(-20deg) translateX(480%);}
-  }
-  /* Stagger: cada chip empieza el destello un poco después que el anterior,
-     como una cadena de luces. */
-  .social-chip.owner-shine:nth-child(1)::before{animation-delay:.1s;}
-  .social-chip.owner-shine:nth-child(2)::before{animation-delay:.4s;}
-  .social-chip.owner-shine:nth-child(3)::before{animation-delay:.7s;}
-  .social-chip.owner-shine:nth-child(4)::before{animation-delay:1s;}
-  .social-chip.owner-shine:nth-child(5)::before{animation-delay:1.3s;}
-  .social-chip.owner-shine:nth-child(6)::before{animation-delay:1.6s;}
-  .social-chip.owner-shine:nth-child(7)::before{animation-delay:1.9s;}
   @media (prefers-reduced-motion: reduce){
-    .profile-panel.owner-profile,
-    .profile-panel.owner-profile .profile-banner::after,
-    .profile-panel.owner-profile .profile-avatar,
-    .social-chip.owner-shine,
-    .social-chip.owner-shine::before{
+    .profile-panel.owner-profile #profile-avatar-wrap::before,
+    .admin-badge,
+    .owner-sparkle,
+    .social-chip.owner-shine{
       animation:none !important;
     }
   }
@@ -1743,7 +1723,7 @@
 
       <div class="profile-head">
         <div class="profile-head-top">
-          <div class="profile-avatar-wrap">
+          <div class="profile-avatar-wrap" id="profile-avatar-wrap">
             <div class="avatar profile-avatar" id="profile-avatar"></div>
             <input type="file" id="avatar-file" accept="image/*" class="hidden-file" onchange="handleAvatarFile(event)">
             <label class="avatar-edit-btn hidden" id="avatar-edit-btn" for="avatar-file" title="Profilbild ändern">📷</label>
@@ -4656,10 +4636,11 @@ function renderProfileView(u){
   document.getElementById('profile-handle').textContent = '@' + u.username.toLowerCase();
   document.getElementById('profile-bio').textContent = u.bio || 'Es wurde noch keine Biografie geschrieben.';
 
-  // Perfil del dueño de la página: brillos y animaciones especiales (ver
-  // CSS .owner-profile) para que se distinga a simple vista de cualquier
-  // otro perfil.
+  // Perfil del dueño de la página: efecto "polvo mágico" (ver CSS
+  // .owner-profile) para que se distinga a simple vista de cualquier otro
+  // perfil.
   document.getElementById('profile-panel').classList.toggle('owner-profile', !!u.isAdmin);
+  renderOwnerSparkles(!!u.isAdmin);
 
   const isOwn = currentUser && currentUser.username === u.username;
 
@@ -5142,6 +5123,56 @@ function discoverToggleLike(){
 function discoverStartChat(){
   if(!discoverList.length) return;
   openDirectChat(discoverList[discoverIndex].username);
+}
+
+// Inserta/quita las partículas doradas que titilan alrededor del avatar y
+// en las esquinas del banner del perfil del dueño de la página (ver CSS
+// .owner-sparkle). Se limpia primero por si quedaron restos de un render
+// anterior (p.ej. al pasar de ver el perfil del admin a otro perfil).
+function renderOwnerSparkles(isOwner){
+  const avatarWrap = document.getElementById('profile-avatar-wrap');
+  const banner = document.getElementById('profile-banner');
+  [avatarWrap, banner].forEach(el => {
+    if(!el) return;
+    el.querySelectorAll('.owner-sparkle').forEach(s => s.remove());
+  });
+  if(!isOwner || !avatarWrap || !banner) return;
+
+  // Puntos fijos alrededor del aro del avatar (círculo de 88px), con
+  // tamaños y demoras distintas para que no titilen todas a la vez.
+  const avatarSpots = [
+    {top:'-3px', left:'12px', size:'7px', delay:'0s'},
+    {top:'18px', left:'-6px', size:'5px', delay:'.5s'},
+    {top:'62px', left:'-4px', size:'6px', delay:'1s'},
+    {top:'78px', left:'40px', size:'5px', delay:'1.5s'},
+    {top:'8px', left:'80px', size:'6px', delay:'.8s'},
+  ];
+  avatarSpots.forEach(s => {
+    const dot = document.createElement('span');
+    dot.className = 'owner-sparkle';
+    dot.style.top = s.top; dot.style.left = s.left;
+    dot.style.width = s.size; dot.style.height = s.size;
+    dot.style.animationDelay = s.delay;
+    avatarWrap.appendChild(dot);
+  });
+
+  // Puntos repartidos por el banner, más dispersos ya que es un área
+  // grande y ancha.
+  const bannerSpots = [
+    {top:'14%', left:'8%', size:'5px', delay:'.2s'},
+    {top:'70%', left:'18%', size:'4px', delay:'1.2s'},
+    {top:'22%', left:'88%', size:'6px', delay:'.6s'},
+    {top:'75%', left:'93%', size:'5px', delay:'1.8s'},
+    {top:'45%', left:'50%', size:'4px', delay:'2s'},
+  ];
+  bannerSpots.forEach(s => {
+    const dot = document.createElement('span');
+    dot.className = 'owner-sparkle';
+    dot.style.top = s.top; dot.style.left = s.left;
+    dot.style.width = s.size; dot.style.height = s.size;
+    dot.style.animationDelay = s.delay;
+    banner.appendChild(dot);
+  });
 }
 
 function renderSocials(socials, isOwner){
