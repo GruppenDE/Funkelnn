@@ -4566,12 +4566,12 @@ function renderProfileView(u){
   const banner = document.getElementById('profile-banner');
   const bKey = u.username.toLowerCase();
   const knownBanner = (bannerCache[bKey] !== undefined) ? bannerCache[bKey] : u.banner;
-  banner.style.backgroundImage = knownBanner ? `url(${knownBanner})` : '';
+  setBannerImage(banner, knownBanner);
   if(bannerCache[bKey] === undefined){
     sGet(bannerKey(u.username), true).then(val => {
       bannerCache[bKey] = val || null;
       if(val && viewingProfile === u.username){
-        document.getElementById('profile-banner').style.backgroundImage = `url(${val})`;
+        setBannerImage(document.getElementById('profile-banner'), val);
         if(currentUser && currentUser.username === u.username){
           document.getElementById('banner-pos-btn').classList.remove('hidden');
         }
@@ -5159,13 +5159,37 @@ async function handleAvatarFile(e){
   e.target.value = '';
 }
 
+// Degradado de respaldo que ya usa .profile-banner en el CSS base (cuando
+// no hay foto). Ahora también se usa como SEGUNDA capa de fondo detrás de
+// la foto real (ver setBannerImage), para rellenar los costados que quedan
+// libres cuando la foto se muestra completa con 'contain' en vez de
+// recortada con 'cover'.
+const BANNER_FALLBACK_GRADIENT = 'linear-gradient(120deg,#2a2f66,#1a1d42)';
+// Único lugar donde se asigna la foto del banner: siempre agrega el
+// degradado como segunda capa (detrás), así los costados libres alrededor
+// de la foto (cuando no llena todo el ancho) nunca quedan vacíos/transparentes.
+function setBannerImage(el, url){
+  el.style.backgroundImage = url ? `url(${url}), ${BANNER_FALLBACK_GRADIENT}` : '';
+}
 function applyBannerPosition(el, posStr, zoom){
-  el.style.backgroundPosition = posStr || '50% 50%';
-  // El zoom guardado (>1) se traduce a un background-size mayor a 'cover',
-  // así el ajuste hecho en el modal de posición también se ve en el banner
-  // real, no solo en la vista previa.
+  const pos = posStr || '50% 50%';
+  // Dos capas (foto + degradado de respaldo, ver setBannerImage): cada
+  // propiedad necesita un valor por capa, en el mismo orden.
+  el.style.backgroundPosition = `${pos}, center`;
+  // El zoom guardado (>1) se traduce a un background-size mayor, así el
+  // ajuste hecho en el modal de posición también se ve en el banner real,
+  // no solo en la vista previa.
   const z = zoom || 1;
-  el.style.backgroundSize = z > 1 ? (Math.round(z * 100) + '% auto') : 'cover';
+  // ANTES: sin zoom (z<=1) la foto usaba 'cover', que en fotos verticales
+  // (retrato) dentro de este banner ancho y bajo la agranda muchísimo para
+  // taparlo por completo, dejando visible solo una tira mínima y muy
+  // recortada de la imagen — de ahí que "no cuadraban las fotos". AHORA:
+  // sin zoom, la foto usa 'contain' — se ve COMPLETA dentro del banner, y
+  // el degradado de la segunda capa rellena los costados libres. Si el
+  // usuario quiere acercar más con el control de zoom, eso sigue
+  // funcionando igual que antes.
+  const photoSize = z > 1 ? (Math.round(z * 100) + '% auto') : 'contain';
+  el.style.backgroundSize = `${photoSize}, cover`;
 }
 
 async function handleBannerFile(e){
