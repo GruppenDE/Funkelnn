@@ -732,15 +732,38 @@
     0%,100%{opacity:0;transform:scale(.3);}
     50%{opacity:1;transform:scale(1);}
   }
-  /* Redes sociales del dueño: solo un resplandor dorado que pulsa
-     suavemente, sin barrido de luz cruzando el ícono. */
+  /* Redes sociales del dueño: el resplandor pulsante usa el color propio
+     de cada logo (definido más abajo por plataforma vía variables CSS),
+     no un dorado genérico — así Telegram brilla azul, WhatsApp verde,
+     Instagram magenta, etc. */
   .social-chip.owner-shine{
-    border-color:rgba(255,213,74,.55);
+    border-color:var(--owner-glow-border, rgba(255,213,74,.55));
     animation:ownerChipGlow 2.8s ease-in-out infinite;
   }
   @keyframes ownerChipGlow{
-    0%,100%{box-shadow:0 0 8px 0 rgba(255,213,74,.3);}
-    50%{box-shadow:0 0 14px 2px rgba(255,159,74,.55);}
+    0%,100%{box-shadow:0 0 8px 0 var(--owner-glow-soft, rgba(255,213,74,.3));}
+    50%{box-shadow:0 0 14px 3px var(--owner-glow-strong, rgba(255,159,74,.55));}
+  }
+  .social-chip.owner-shine.ic-telegram{
+    --owner-glow-border:rgba(41,169,234,.6); --owner-glow-soft:rgba(41,169,234,.35); --owner-glow-strong:rgba(41,169,234,.7);
+  }
+  .social-chip.owner-shine.ic-whatsapp{
+    --owner-glow-border:rgba(37,211,102,.6); --owner-glow-soft:rgba(37,211,102,.35); --owner-glow-strong:rgba(37,211,102,.7);
+  }
+  .social-chip.owner-shine.ic-facebook{
+    --owner-glow-border:rgba(24,119,242,.6); --owner-glow-soft:rgba(24,119,242,.35); --owner-glow-strong:rgba(24,119,242,.7);
+  }
+  .social-chip.owner-shine.ic-instagram{
+    --owner-glow-border:rgba(225,48,108,.6); --owner-glow-soft:rgba(240,148,51,.35); --owner-glow-strong:rgba(220,39,67,.7);
+  }
+  .social-chip.owner-shine.ic-twitter{
+    --owner-glow-border:rgba(29,161,242,.6); --owner-glow-soft:rgba(29,161,242,.35); --owner-glow-strong:rgba(29,161,242,.7);
+  }
+  .social-chip.owner-shine.ic-tiktok{
+    --owner-glow-border:rgba(254,44,85,.6); --owner-glow-soft:rgba(37,244,238,.35); --owner-glow-strong:rgba(254,44,85,.7);
+  }
+  .social-chip.owner-shine.ic-snapchat{
+    --owner-glow-border:rgba(255,252,0,.65); --owner-glow-soft:rgba(255,252,0,.4); --owner-glow-strong:rgba(255,252,0,.8);
   }
   @media (prefers-reduced-motion: reduce){
     .profile-panel.owner-profile #profile-avatar-wrap::before,
