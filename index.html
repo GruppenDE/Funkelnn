@@ -710,6 +710,7 @@
     background:linear-gradient(115deg, transparent 40%, rgba(255,255,255,.35) 50%, transparent 60%);
     background-size:250% 250%;
     background-position:-100% -100%;
+    will-change:background-position;
     animation:ownerBannerShine 5s ease-in-out infinite;
     animation-delay:1s;
   }
@@ -737,9 +738,10 @@
   }
   .social-chip.owner-shine::before{
     content:'';
-    position:absolute;top:0;left:-60%;width:40%;height:100%;
+    position:absolute;top:0;left:-40%;width:40%;height:100%;
     background:linear-gradient(115deg, transparent, rgba(255,255,255,.55), transparent);
-    transform:skewX(-20deg);
+    transform:skewX(-20deg) translateX(0%);
+    will-change:transform;
     animation:ownerChipSweep 3.2s ease-in-out infinite;
   }
   @keyframes ownerChipGlow{
@@ -747,8 +749,8 @@
     50%{box-shadow:0 0 16px 3px rgba(255,159,74,.6);}
   }
   @keyframes ownerChipSweep{
-    0%{left:-60%;}
-    45%,100%{left:130%;}
+    0%{transform:skewX(-20deg) translateX(0%);}
+    45%,100%{transform:skewX(-20deg) translateX(480%);}
   }
   /* Stagger: cada chip empieza el destello un poco después que el anterior,
      como una cadena de luces. */
@@ -3961,8 +3963,6 @@ function isValidSocialValue(key, rawValue){
 
 async function openProfile(username){
   if(!username) return;
-  const users = await sGet('farol-users', true);
-  if(users) usersCache = users;
   const key = username.toLowerCase();
 
   // Prefer what we know locally about "myself" (always accurate and instant),
@@ -3975,15 +3975,35 @@ async function openProfile(username){
   // perfil "en blanco" — sin bio ni redes sociales — sin importar lo que el
   // admin hubiera guardado. `buildAdminUser()` ahora es solo el último
   // recurso, para cuando el admin todavía no guardó ningún dato.
-  let u = (currentUser && currentUser.username.toLowerCase() === key) ? currentUser : null;
-  if(!u) u = usersCache[key];
-  if(!u && username === ADMIN_NAME) u = buildAdminUser();
-  if(!u) u = {username, color: colorFor(username)};
+  function pickUser(){
+    let u = (currentUser && currentUser.username.toLowerCase() === key) ? currentUser : null;
+    if(!u) u = usersCache[key];
+    if(!u && username === ADMIN_NAME) u = buildAdminUser();
+    if(!u) u = {username, color: colorFor(username)};
+    return u;
+  }
 
-  viewingProfile = u.username;
-  renderProfileView(u);
+  // ANTES: se esperaba (await) a bajar TODO el documento compartido de
+  // usuarios antes de mostrar el modal — eso hacía que abrir cualquier
+  // perfil (el del admin incluido) se sintiera lento, con el banner/avatar
+  // apareciendo recién después de un viaje de red completo. AHORA: el
+  // modal se abre YA MISMO con lo que ya tenemos en memoria/caché, y el
+  // documento fresco se pide en paralelo — si trae algo nuevo, se
+  // re-renderiza el perfil sin que la persona haya notado ninguna espera.
+  viewingProfile = username;
+  renderProfileView(pickUser());
   document.getElementById('profile-modal').classList.remove('hidden');
-  await loadGallery(u.username);
+
+  sGet('farol-users', true).then(users => {
+    if(users) usersCache = users;
+    // Si mientras tanto cerraron el modal o abrieron otro perfil, no pisar
+    // esa vista con datos que ya no corresponden.
+    if(viewingProfile === username){
+      renderProfileView(pickUser());
+    }
+  }).catch(()=>{});
+
+  await loadGallery(username);
 }
 // Builds a stable, order-independent room id for a DM between two users,
 // so both people land in the exact same "room" no matter who opens it first.
