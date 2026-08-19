@@ -306,6 +306,21 @@
     color:var(--accent-coral);font-size:13px;border-radius:10px;padding:9px 12px;margin-bottom:14px;
   }
 
+  /* ---------- PROTECCIÓN CONTRA DESCARGA DE FOTOS/VIDEOS ----------
+     No existe forma 100% infalible de impedir que alguien "robe" una
+     imagen que se muestra en una página web (siempre queda la captura de
+     pantalla), pero esto bloquea las vías fáciles y habituales: clic
+     derecho -> "Guardar imagen como", arrastrar la imagen fuera de la
+     página, y mantener presionado en el celular para guardarla. Se aplica
+     de forma global a cualquier <img>/<video> y a los avatares/banners
+     (que se pintan como fondo, no como <img>), para cubrir mensajes de
+     las salas, fotos de perfil/galería y el visor ampliado por igual. */
+  img, video, .avatar, #profile-banner, .gallery-thumb, .discover-full-photo{
+    -webkit-user-drag:none; user-drag:none;
+    -webkit-touch-callout:none;
+    user-select:none; -webkit-user-select:none;
+  }
+
   /* ---------- MODAL (google sim) ---------- */
   .modal-backdrop{
     position:fixed;inset:0;background:rgba(10,10,20,.6);
@@ -818,6 +833,17 @@
     display:flex;overflow:hidden;border:1px solid rgba(255,255,255,.08);position:relative;
   }
   .lightbox-img{width:58%;object-fit:contain;background:#000;}
+
+  /* Visor propio para fotos/videos del chat (ver showProtectedMediaPreview) */
+  .media-preview-overlay{
+    position:fixed;inset:0;z-index:200;background:rgba(6,6,14,.94);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .media-preview-content{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:10px;}
+  .media-preview-close{
+    position:absolute;top:16px;right:16px;background:rgba(10,10,20,.55);
+  }
+
   .lightbox-side{width:42%;display:flex;flex-direction:column;padding:20px;min-height:0;}
   .lightbox-delete-btn{
     flex:0 0 auto;width:auto;align-self:flex-start;padding:6px 12px;font-size:12px;
@@ -2048,6 +2074,82 @@ function showToast(msg, type){
   stack.appendChild(t);
   setTimeout(()=>{ t.remove(); }, 4200);
 }
+
+/* ---------------- PROTECCIÓN CONTRA DESCARGA DE FOTOS/VIDEOS ----------------
+   Bloqueo global (no hace falta tocar cada lugar donde se pinta una foto):
+   - "contextmenu": evita el clic derecho -> "Guardar imagen/video como..."
+     sobre cualquier <img>/<video>, o sobre los avatares/banner/miniaturas
+     de galería (que se pintan como fondo CSS, no como <img>).
+   - "dragstart": evita arrastrar la imagen hacia el escritorio/otra pestaña
+     para guardarla, que en Chrome/Firefox funciona incluso con el clic
+     derecho deshabilitado.
+   Como se explicó al implementarlo: esto no es 100% infalible (una captura
+   de pantalla siempre es posible), pero bloquea las vías fáciles y
+   habituales de descarga en computadora y celular. */
+const PROTECTED_MEDIA_SELECTOR = 'img, video, .avatar, #profile-banner, .gallery-thumb, .discover-full-photo';
+document.addEventListener('contextmenu', (e) => {
+  if(e.target.closest(PROTECTED_MEDIA_SELECTOR)) e.preventDefault();
+});
+document.addEventListener('dragstart', (e) => {
+  if(e.target.closest(PROTECTED_MEDIA_SELECTOR)) e.preventDefault();
+});
+
+// Bloquea el atajo de teclado para abrir las herramientas de desarrollador
+// (F12, Ctrl/Cmd+Shift+I/J/C), "ver código fuente" (Ctrl+U) y "guardar
+// página como" (Ctrl+S). OJO — esto es solo una traba adicional para el
+// usuario promedio, NO una protección real: cualquiera puede abrir las
+// herramientas de desarrollador desde el menú del navegador (sin usar
+// ningún atajo), y como cada foto viaja al navegador ya incrustada
+// completa en la página (no se pide "aparte" a un servidor), impedir el
+// atajo de teclado no le esconde nada a quien de verdad quiera mirar.
+document.addEventListener('keydown', (e) => {
+  const key = (e.key || '').toLowerCase();
+  const blockDevtoolsKey = key === 'f12';
+  const blockDevtoolsCombo = (e.ctrlKey || e.metaKey) && e.shiftKey && ['i','j','c'].includes(key);
+  const blockViewSource = (e.ctrlKey || e.metaKey) && key === 'u';
+  const blockSavePage = (e.ctrlKey || e.metaKey) && key === 's';
+  if(blockDevtoolsKey || blockDevtoolsCombo || blockViewSource || blockSavePage){
+    e.preventDefault();
+  }
+});
+
+/* ---------------- VISOR PROPIO PARA FOTOS/VIDEOS DEL CHAT ----------------
+   Antes, tocar una foto enviada en una sala la abría "cruda" en una pestaña
+   nueva (window.open) — eso escapaba por completo a cualquier protección
+   de esta página, porque el navegador mostraba el archivo original en su
+   visor nativo de imágenes, donde SIEMPRE se puede guardar. Este visor
+   muestra la foto/video en grande sin salir de la app, así las mismas
+   protecciones de arriba (clic derecho, arrastrar) siguen aplicando.
+*/
+function showProtectedMediaPreview(url, isVideo){
+  const overlay = document.createElement('div');
+  overlay.className = 'media-preview-overlay';
+  overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn-icon media-preview-close';
+  closeBtn.textContent = '✕';
+  closeBtn.setAttribute('aria-label', 'Schließen');
+  closeBtn.onclick = () => overlay.remove();
+  let el;
+  if(isVideo){
+    el = document.createElement('video');
+    el.src = url;
+    el.controls = true;
+    el.autoplay = true;
+    el.setAttribute('controlsList', 'nodownload noremoteplayback');
+    el.disablePictureInPicture = true;
+  }else{
+    el = document.createElement('img');
+    el.src = url;
+    el.alt = 'Foto';
+  }
+  el.className = 'media-preview-content';
+  el.draggable = false;
+  overlay.appendChild(el);
+  overlay.appendChild(closeBtn);
+  document.body.appendChild(overlay);
+}
 const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,:;!?'")\]])/g;
 // Builds a text node + <a> fragment for message text, so links are
 // clickable without ever using innerHTML on user-provided text (XSS-safe).
@@ -3220,11 +3322,21 @@ function renderMessages(msgs){
       if(m.media.type === 'video'){
         const vid = document.createElement('video');
         vid.src = m.media.url; vid.controls = true;
+        // "nodownload" oculta el botón de descarga que Chrome añade solo a
+        // los controles nativos de <video> (aparte de la protección global
+        // de clic derecho/arrastrar definida más arriba).
+        vid.setAttribute('controlsList', 'nodownload noremoteplayback');
+        vid.disablePictureInPicture = true;
         mediaWrap.appendChild(vid);
       }else{
         const img = document.createElement('img');
         img.src = m.media.url; img.alt = 'Bild gesendet von ' + m.user;
-        img.onclick = () => window.open(m.media.url, '_blank');
+        img.draggable = false;
+        // Antes esto abría la foto "cruda" en una pestaña nueva (window.open),
+        // lo que escapaba a cualquier protección de esta página — ahora usa
+        // el visor propio de la app, que mantiene el bloqueo de clic
+        // derecho/arrastrar.
+        img.onclick = () => showProtectedMediaPreview(m.media.url, false);
         mediaWrap.appendChild(img);
       }
       bubble.appendChild(mediaWrap);
