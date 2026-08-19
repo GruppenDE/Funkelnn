@@ -1273,8 +1273,13 @@
        espacio con una tarjeta normal en la misma fila de 2 columnas: ahí
        su nombre/descripción se cortaban en líneas muy apretadas y las dos
        tarjetas quedaban de alturas distintas. En mobile, ocupa el ancho
-       completo — igual que una tarjeta destacada/premium debería verse. */
-    .lobby-card.is-special{grid-column:1 / -1;}
+       completo — igual que una tarjeta destacada/premium debería verse.
+       "order:-1" la visualmente al frente de la grilla (sin tocar el
+       orden real de las salas en el código): si quedara en su posición
+       original (2da tarjeta), dejaría un hueco vacío al lado de la
+       primera tarjeta, porque una tarjeta de ancho completo a mitad de
+       grilla no deja que las de abajo "suban" a tapar ese espacio. */
+    .lobby-card.is-special{grid-column:1 / -1;order:-1;}
     .lobby-card.is-special .lobby-card-top{margin-bottom:10px;}
     .lobby-card.is-special .lobby-card-name{font-size:17px;}
     .lobby-card.is-special .lobby-card-desc{font-size:12.5px;margin-bottom:12px;}
