@@ -4710,11 +4710,21 @@ async function toggleProfileLike(username){
     renderProfileView(usersCache[username.toLowerCase()] || userLookup(username));
   }
   // Si la pantalla de descubrimiento está abierta mostrando este mismo
-  // perfil, refrescamos su corazón/contador sin recargar toda la tarjeta.
+  // perfil: si fue un Like (no un "quitar like"), lo sacamos de la lista
+  // de esta sesión y pasamos a la siguiente tarjeta, para que no se
+  // vuelva a mostrar el mismo perfil ya que le diste like. Si fue quitar
+  // el like, se mantiene el comportamiento de antes (solo repintar el
+  // corazón/contador).
   if(currentView === 'discover' && discoverList[discoverIndex] &&
      discoverList[discoverIndex].username.toLowerCase() === username.toLowerCase()){
-    discoverList[discoverIndex] = usersCache[username.toLowerCase()] || discoverList[discoverIndex];
-    updateDiscoverLikeUI(discoverList[discoverIndex]);
+    if(likedNow){
+      discoverList.splice(discoverIndex, 1);
+      if(discoverIndex >= discoverList.length) discoverIndex = Math.max(0, discoverList.length - 1);
+      renderDiscoverCard();
+    }else{
+      discoverList[discoverIndex] = usersCache[username.toLowerCase()] || discoverList[discoverIndex];
+      updateDiscoverLikeUI(discoverList[discoverIndex]);
+    }
   }
   if(limitReached){
     showToast(`Du kannst maximal ${MAX_LIKES_GIVEN} Likes gleichzeitig vergeben. Entferne zuerst einen Like, um einen neuen zu geben.`, 'error');
@@ -4819,9 +4829,15 @@ async function loadDiscoverList(){
   // poder ver (y dar like) a perfiles de todos los géneros, hombres
   // incluidos, sin importar qué género tenga guardado su propia cuenta.
   const wanted = (currentUser && !currentUser.isAdmin) ? oppositeGender(currentUser.gender) : null;
+  const meLower = currentUser ? currentUser.username.toLowerCase() : '';
   let list = Object.values(users)
-    .filter(u => u && u.username && (!currentUser || u.username.toLowerCase() !== currentUser.username.toLowerCase()))
-    .filter(u => !wanted || u.gender === wanted);
+    .filter(u => u && u.username && (!currentUser || u.username.toLowerCase() !== meLower))
+    .filter(u => !wanted || u.gender === wanted)
+    // Pedido: una vez que le diste like a un perfil, no debe volver a
+    // aparecer en Descubrir — solo aparecen perfiles nuevos a medida que
+    // se registra más gente. Como el like ya queda guardado en u.likes,
+    // alcanza con excluir acá a cualquiera que ya tenga tu like.
+    .filter(u => !(Array.isArray(u.likes) && u.likes.some(l => l.toLowerCase() === meLower)));
 
   // Pedido específico: un usuario registrado como "hombre" (currentUser.gender
   // === 'male', o sea wanted === 'female') ve SOLO 5 perfiles de mujeres,
