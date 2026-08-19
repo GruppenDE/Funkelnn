@@ -5184,15 +5184,13 @@ function applyBannerPosition(el, posStr, zoom){
   // ajuste hecho en el modal de posición también se ve en el banner real,
   // no solo en la vista previa.
   const z = zoom || 1;
-  // ANTES: sin zoom (z<=1) la foto usaba 'cover', que en fotos verticales
-  // (retrato) dentro de este banner ancho y bajo la agranda muchísimo para
-  // taparlo por completo, dejando visible solo una tira mínima y muy
-  // recortada de la imagen — de ahí que "no cuadraban las fotos". AHORA:
-  // sin zoom, la foto usa 'contain' — se ve COMPLETA dentro del banner, y
-  // el degradado de la segunda capa rellena los costados libres. Si el
-  // usuario quiere acercar más con el control de zoom, eso sigue
-  // funcionando igual que antes.
-  const photoSize = z > 1 ? (Math.round(z * 100) + '% auto') : 'contain';
+  // La foto SIEMPRE ocupa el 100% del ancho del banner (como en Twitter),
+  // sin importar su proporción original — así nunca queda una franja vacía
+  // a los costados. El alto se ajusta solo (según la proporción real de la
+  // foto) y, si sobra, se recorta con overflow:hidden del contenedor; la
+  // posición vertical se controla con el arrastre guardado en `pos`.
+  // zoom>1 simplemente amplía ese 100% base para acercar la imagen.
+  const photoSize = (Math.round(z * 100)) + '% auto';
   el.style.backgroundSize = `${photoSize}, cover`;
 }
 
@@ -5271,7 +5269,11 @@ function openBannerPositionModal(){
     const frameW = frame.clientWidth, frameH = frame.clientHeight;
     frame.dataset.naturalW = img.naturalWidth;
     frame.dataset.naturalH = img.naturalHeight;
-    frame.dataset.baseScale = Math.max(frameW / img.naturalWidth, frameH / img.naturalHeight);
+    // La escala base debe llenar el ANCHO completo del marco (igual que el
+    // banner real, ver applyBannerPosition), no el "cover" clásico que
+    // llenaba ancho Y alto — si usáramos cover acá, la vista previa del
+    // editor no coincidiría con cómo se ve después en el banner guardado.
+    frame.dataset.baseScale = frameW / img.naturalWidth;
     const posStr = currentUser.bannerPos || '50% 50%';
     const parts = posStr.split(' ').map(s => parseFloat(s));
     frame.dataset.px = isNaN(parts[0]) ? 50 : parts[0];
