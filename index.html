@@ -1263,7 +1263,21 @@
     .lobby-card-desc{min-height:0;}
   }
   @media (max-width:420px){
-    .lobby-grid{grid-template-columns:1fr 1fr;}
+    .lobby-grid{grid-template-columns:1fr 1fr;align-items:stretch;}
+    .lobby-card{padding:14px;}
+    .lobby-emoji{width:38px;height:38px;font-size:28px;}
+    .lobby-card-name{font-size:14.5px;}
+    .lobby-card-desc{font-size:11px;}
+    .lobby-live{font-size:10px;padding:4px 8px 4px 6px;}
+    /* La tarjeta especial (Chatte mit Valeria) no debe competir por
+       espacio con una tarjeta normal en la misma fila de 2 columnas: ahí
+       su nombre/descripción se cortaban en líneas muy apretadas y las dos
+       tarjetas quedaban de alturas distintas. En mobile, ocupa el ancho
+       completo — igual que una tarjeta destacada/premium debería verse. */
+    .lobby-card.is-special{grid-column:1 / -1;}
+    .lobby-card.is-special .lobby-card-top{margin-bottom:10px;}
+    .lobby-card.is-special .lobby-card-name{font-size:17px;}
+    .lobby-card.is-special .lobby-card-desc{font-size:12.5px;margin-bottom:12px;}
   }
 
   /* mobile */
