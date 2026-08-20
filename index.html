@@ -1456,7 +1456,7 @@
       <h1 class="hero-title">Wo der <span>Platz</span> niemals schläft.</h1>
       <p class="hero-sub">Betritt Live-Chaträume, lerne neue Leute kennen und finde deine Lieblingsecke der Community. Ohne Downloads, ohne Umwege.</p>
       <div class="hero-stats">
-        <div class="hero-stat"><b>8</b><span>aktive Räume</span></div>
+        <div class="hero-stat"><b>12</b><span>aktive Räume</span></div>
         <div class="hero-stat"><b>24/7</b><span>immer aktiv</span></div>
         <div class="hero-stat"><b>100%</b><span>kostenlos</span></div>
       </div>
@@ -1467,38 +1467,26 @@
           <div class="tab active" id="tab-login" onclick="switchTab('login')">Anmelden</div>
           <div class="tab" id="tab-register" onclick="switchTab('register')">Registrieren</div>
         </div>
-
         <div id="error-box" class="error-box hidden"></div>
 
-        <!-- LOGIN -->
+        <!-- INICIAR SESIÓN -->
         <div id="form-login">
           <h2>Willkommen zurück</h2>
-          <div class="sub">Betritt den Platz und mach da weiter, wo du aufgehört hast.</div>
-          <button class="btn-google" onclick="signInWithGoogle()">
-            <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.16.27-1.7V4.97H.98A9 9 0 000 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.98 4.97l2.97 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
-            Mit Google fortfahren
-          </button>
-          <div class="divider">oder mit deiner E-Mail fortfahren</div>
+          <div class="sub">Melde dich mit deinem Benutzernamen und Passwort an.</div>
           <form onsubmit="handleLogin(event)">
             <div class="field"><label>Benutzername</label><input id="login-username" type="text" placeholder="dein_benutzername" autocomplete="username" required></div>
-            <div class="field"><label>Passwort</label><input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required></div>
+            <div class="field"><label>Passwort</label><input id="login-password" type="password" placeholder="mindestens 6 Zeichen" autocomplete="current-password" required></div>
             <button class="btn-primary" type="submit">Einloggen</button>
           </form>
           <div class="switch-line">Du hast noch kein Konto? <a onclick="switchTab('register')">Registrieren</a></div>
         </div>
 
-        <!-- REGISTER -->
+        <!-- REGISTRO SIN CORREO -->
         <div id="form-register" class="hidden">
           <h2>Erstelle dein Konto</h2>
-          <div class="sub">Wähle einen Namen und du hast deinen Platz.</div>
-          <button class="btn-google" onclick="signInWithGoogle()">
-            <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.16.27-1.7V4.97H.98A9 9 0 000 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.98 4.97l2.97 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
-            Mit Google fortfahren
-          </button>
-          <div class="divider">oder registriere dich mit deiner E-Mail</div>
+          <div class="sub">Nur Benutzername, Passwort und Geschlecht – keine E-Mail erforderlich.</div>
           <form onsubmit="handleRegister(event)">
             <div class="field"><label>Benutzername</label><input id="reg-username" type="text" placeholder="3 bis 16 Zeichen" autocomplete="username" required></div>
-            <div class="field"><label>E-Mail-Adresse</label><input id="reg-email" type="email" placeholder="deine@email.com" autocomplete="email" required></div>
             <div class="field"><label>Passwort</label><input id="reg-password" type="password" placeholder="mindestens 6 Zeichen" autocomplete="new-password" required></div>
             <div class="field">
               <label>Ich bin</label>
@@ -1511,7 +1499,7 @@
             </div>
             <button class="btn-primary" type="submit">Konto erstellen</button>
           </form>
-          <div class="switch-line">Hast du schon ein Konto? <a onclick="switchTab('login')">Anmelden</a></div>
+          <div class="switch-line">Du hast bereits ein Konto? <a onclick="switchTab('login')">Anmelden</a></div>
         </div>
       </div>
     </div>
@@ -1830,7 +1818,7 @@
         <div class="admin-crown">👑</div>
         <div>
           <div class="admin-title">Admin-Panel</div>
-          <div class="admin-sub">Funkeln · Sitzung von Loresmitt</div>
+          <div class="admin-sub">Funkeln · Administrator-Sitzung</div>
         </div>
       </div>
       <div class="admin-stats" id="admin-stats"></div>
@@ -1986,19 +1974,29 @@ const ROOM_ICON_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAA
 
 /* ---------------- CONFIG ---------------- */
 const ROOMS = [
-  {id:'general', icon:'img', name:'Chatte mit Valeria', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://gruppende.github.io/chatgeil/', special:true},
-  {id:'gaming', icon:'img', name:'chatten öffentlich', desc:'<strong>🔞 Öffentliche Chatrooms ab 18</strong><br><em>Tritt öffentlichen Chaträumen bei, lerne neue Leute kennen und chatte frei.💬🔥<br>Jetzt chatten!</em>', capacity:60, link:'https://secretflirt.short.gy/DateFinden', special:true},
+  {id:'general', icon:'img', photo:'https://ei.phncdn.com/videos/202205/09/407788811/thumbs_23/(m=eaSaaTbaAaaaa)(mh=9VNxVVOROhBk2Uyz)3.jpg', name:'Chatte mit Valeria', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://gruppende.github.io/chatgeil/', special:true},
+  {id:'lena', icon:'img', photo:'https://mundopack-tv.com/wp-content/uploads/2025/03/1-23-747x1024.jpeg', name:'Chatte mit Lena', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://secretflirt.short.gy/DateFinden', special:true},
+  {id:'gaming', icon:'img', name:'Stuttgart', desc:'Wiege des Motors und der Ingenieurskunst', capacity:40},
   {id:'ayuda', emoji:'🔞', name:'+18', desc:'Inhalte für Erwachsene', capacity:20},
   {id:'ligar', icon:'img', name:'München', desc:'Bier, Tradition und gute Stimmung', capacity:50},
   {id:'musica', icon:'img', name:'Hamburg', desc:'Hafen, Musik und Nachtleben', capacity:35},
   {id:'cine', icon:'img', name:'Frankfurt', desc:'Wolkenkratzer und Finanzrhythmus', capacity:35},
   {id:'deportes', icon:'img', name:'Köln', desc:'Der Dom und der rheinische Frohsinn', capacity:35},
   {id:'presentaciones', icon:'img', name:'Berlin', desc:'Die Hauptstadt, die niemals schläft', capacity:30},
+  {id:'schweiz', flagUrl:'https://upload.wikimedia.org/wikipedia/commons/0/08/Flag_of_Switzerland_%28Pantone%29.svg', name:'Schweiz', desc:'Chats und neue Kontakte aus der Schweiz', capacity:40},
+  {id:'oesterreich', flagUrl:'https://upload.wikimedia.org/wikipedia/commons/4/41/Flag_of_Austria.svg', name:'Österreich', desc:'Chats und neue Kontakte aus Österreich', capacity:40},
+  {id:'usa', flagUrl:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Flag_of_the_United_States.svg/3840px-Flag_of_the_United_States.svg.png', name:'USA', desc:'Chats und neue Kontakte aus den USA', capacity:50},
 ];
 // Salas cuyo icono es la nueva imagen de banderas de Alemania (todas menos
 // "+18", que conserva su emoji 🔞) usan esta función para no repetir el
 // mismo <img> a mano en cada lugar donde se listan salas.
 function roomIconHtml(r){
+  if(r.flagUrl){
+    return `<img src="${r.flagUrl}" alt="Flagge ${r.name}" style="width:88%;height:88%;object-fit:cover;border-radius:50%;aspect-ratio:1/1;">`;
+  }
+  if(r.photo){
+    return `<img src="${r.photo}" alt="${r.name}" style="width:88%;height:88%;object-fit:cover;border-radius:50%;aspect-ratio:1/1;">`;
+  }
   if(r.icon === 'img'){
     return `<img src="${ROOM_ICON_DATA_URI}" alt="${r.name}" style="width:88%;height:88%;object-fit:contain;">`;
   }
@@ -2010,8 +2008,19 @@ const ADMIN_EMAIL = 'cristhianzh1994@gmail.com';
 // contra Firebase Authentication (ver handleLogin), así que la contraseña
 // real nunca aparece en el código fuente que cualquiera puede leer en el navegador.
 const ADMIN_NAME = 'Loresmitt (Telegram)';
+const SECONDARY_ADMIN_NAME = 'Lena_Chat18';
 const ADMIN_COLOR = '#FFD54A';
 const ONLINE_TTL = 30000;
+
+function isAdminUsername(username){
+  const key = String(username || '').toLowerCase();
+  return key === ADMIN_NAME.toLowerCase() || key === SECONDARY_ADMIN_NAME.toLowerCase();
+}
+
+function applyKnownAdminRole(user){
+  if(!user || !isAdminUsername(user.username)) return user;
+  return Object.assign({}, user, {isAdmin:true, provider:'admin'});
+}
 
 let currentUser = null;
 let currentRoom = 'general';
@@ -2462,7 +2471,12 @@ function paintPhotoNotifBadgeFromLocalCache(username){
 let usersCache = {};
 async function refreshUsersCache(){
   const users = await sGet('farol-users', true);
-  if(users) usersCache = users;
+  if(users){
+    usersCache = users;
+    Object.keys(usersCache).forEach(key => {
+      usersCache[key] = applyKnownAdminRole(usersCache[key]);
+    });
+  }
   // Never let a background refresh clobber what we know locally about
   // ourselves (bio/socials saved via this doc). Avatar/banner live in their
   // own per-user documents now, so they aren't affected by this doc at all —
@@ -2471,7 +2485,7 @@ async function refreshUsersCache(){
 }
 function userLookup(username){
   if(username === ADMIN_NAME) return usersCache[ADMIN_NAME.toLowerCase()] || buildAdminUser();
-  return usersCache[username.toLowerCase()] || {username, color: colorFor(username)};
+  return applyKnownAdminRole(usersCache[username.toLowerCase()] || {username, color: colorFor(username)});
 }
 function applyAvatarStyle(el, username){
   const u = userLookup(username);
@@ -2886,6 +2900,8 @@ function showAuth(){
 }
 
 async function showChat(){
+  currentUser = applyKnownAdminRole(currentUser);
+  usersCache[currentUser.username.toLowerCase()] = currentUser;
   hideLoadingScreen();
   document.getElementById('view-auth').classList.add('hidden');
   document.getElementById('view-lobby').classList.remove('hidden');
@@ -2919,6 +2935,70 @@ async function showChat(){
   // usando la app sin haber elegido.
   if(currentUser && !currentUser.gender){
     openGenderModal();
+  }
+  if(currentUser && currentUser.username !== ADMIN_NAME && !currentUser.passwordHash){
+    setTimeout(ensureLegacyPassword, 700);
+  }
+}
+
+// Las cuentas creadas en la versión anterior no tenían contraseña. Mientras
+// su sesión todavía sigue abierta en el dispositivo original, les permitimos
+// establecer una para que después puedan cerrar sesión y volver a entrar.
+async function ensureLegacyPassword(){
+  if(!currentUser || currentUser.username === ADMIN_NAME || currentUser.passwordHash) return;
+  const key = currentUser.username.toLowerCase();
+  const onceKey = 'farol-password-migration-' + key;
+  if(sessionStorage.getItem(onceKey)) return;
+  sessionStorage.setItem(onceKey, '1');
+
+  try{
+    const users = await sGet('farol-users', true) || {};
+    const fresh = users[key];
+    if(fresh && fresh.passwordHash){
+      currentUser = applyKnownAdminRole(fresh);
+      usersCache[key] = currentUser;
+      cacheUserLocally(currentUser);
+      return;
+    }
+  }catch(e){}
+
+  const password = window.prompt('Lege jetzt ein Passwort für dein Konto fest (mindestens 6 Zeichen), damit du dich nach dem Abmelden wieder einloggen kannst:');
+  if(!password){
+    showToast('Ohne Passwort kannst du dich nach dem Abmelden nicht erneut anmelden.', 'error');
+    return;
+  }
+  if(password.length < 6){
+    sessionStorage.removeItem(onceKey);
+    showToast('Das Passwort muss mindestens 6 Zeichen lang sein.', 'error');
+    return;
+  }
+  const confirmPassword = window.prompt('Passwort wiederholen:');
+  if(confirmPassword !== password){
+    sessionStorage.removeItem(onceKey);
+    showToast('Die Passwörter stimmen nicht überein.', 'error');
+    return;
+  }
+
+  let updatedUser = null;
+  try{
+    await sTransact('farol-users', (users) => {
+      users = users || {};
+      const u = users[key];
+      if(!u) return users;
+      u.passwordHash = hashPw(password);
+      u.provider = 'manual';
+      users[key] = u;
+      updatedUser = u;
+      return users;
+    });
+    if(!updatedUser) throw new Error('Konto nicht gefunden');
+    currentUser = applyKnownAdminRole(updatedUser);
+    usersCache[key] = currentUser;
+    cacheUserLocally(currentUser);
+    showToast('Passwort gespeichert. Du kannst dich jetzt später wieder anmelden.', 'success');
+  }catch(e){
+    sessionStorage.removeItem(onceKey);
+    showToast('Das Passwort konnte nicht gespeichert werden. Bitte versuche es erneut.', 'error');
   }
 }
 
@@ -3155,15 +3235,36 @@ function hideError(){ document.getElementById('error-box').classList.add('hidden
 async function handleRegister(e){
   e.preventDefault(); hideError();
   const username = document.getElementById('reg-username').value.trim();
-  const email = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-password').value;
   const gender = document.getElementById('reg-gender').value;
+
+  // El acceso administrativo sigue protegido, pero no aparece como opción
+  // para los usuarios normales. El administrador escribe su correo aquí y
+  // confirma su contraseña en el aviso privado del navegador.
+  if(username.toLowerCase() === ADMIN_EMAIL.toLowerCase()){
+    const adminPassword = window.prompt('Administrator-Passwort:');
+    if(!adminPassword) return;
+    try{
+      await auth.signInWithEmailAndPassword(ADMIN_EMAIL, adminPassword);
+      currentUser = await loadAdminUser();
+      usersCache[ADMIN_NAME.toLowerCase()] = currentUser;
+      await sSet('farol-session', ADMIN_NAME, false);
+      showChat();
+    }catch(err){
+      showError('Administrator-Zugang nicht möglich.');
+    }
+    return;
+  }
 
   if(!/^[a-zA-Z0-9_ÁÉÍÓÚáéíóúÑñ]{3,16}$/.test(username)){
     showError('Der Benutzername muss zwischen 3 und 16 Zeichen lang sein.'); return;
   }
-  if(password.length < 6){ showError('Das Passwort muss mindestens 6 Zeichen lang sein.'); return; }
-  if(!gender){ showError('Bitte wähle eine Option bei "Ich bin" aus.'); return; }
+  if(password.length < 6){
+    showError('Das Passwort muss mindestens 6 Zeichen lang sein.'); return;
+  }
+  if(!gender){
+    showError('Bitte wähle eine Option bei "Ich bin" aus.'); return;
+  }
 
   const key = username.toLowerCase();
   let newUser = null;
@@ -3176,8 +3277,8 @@ async function handleRegister(e){
       users = users || {};
       if(users[key]){ taken = true; return users; }
       newUser = {
-        username, email, passwordHash: hashPw(password), gender,
-        color: colorFor(username), createdAt: Date.now(), provider: 'manual'
+        username, email:'', passwordHash:hashPw(password), gender,
+        color: colorFor(username), createdAt: Date.now(), provider:'manual'
       };
       users[key] = newUser;
       return users;
@@ -3225,6 +3326,10 @@ async function handleLogin(e){
 
   const users = await sGet('farol-users', true) || {};
   const u = users[username.toLowerCase()];
+  if(u && !u.passwordHash){
+    showError('Dieses ältere Konto hat noch kein Passwort. Öffne es auf dem Gerät, auf dem die Sitzung gespeichert ist, und lege dort zuerst ein Passwort fest.');
+    return;
+  }
   if(!u || u.passwordHash !== hashPw(password)){
     showError('Benutzername oder Passwort falsch.'); return;
   }
@@ -3402,6 +3507,7 @@ function renderMessages(msgs){
   const GROUP_WINDOW = 5 * 60 * 1000;
   msgs.forEach((m, i)=>{
     const own = currentUser && m.user === currentUser.username;
+    const messageIsAdmin = !!m.isAdmin || isAdminUsername(m.user);
     const prev = msgs[i - 1];
     const next = msgs[i + 1];
     const grouped = !!prev && prev.user === m.user && (m.ts - prev.ts) < GROUP_WINDOW;
@@ -3422,7 +3528,7 @@ function renderMessages(msgs){
       b.textContent = m.user;
       b.style.cursor = 'pointer';
       b.onclick = () => openProfile(m.user);
-      if(m.isAdmin){
+      if(messageIsAdmin){
         b.className = 'admin-name';
         const badge = document.createElement('span');
         badge.className = 'admin-badge';
@@ -3463,7 +3569,7 @@ function renderMessages(msgs){
     }
     if(m.text){
       const textEl = document.createElement('div');
-      textEl.className = 'bubble-text' + (m.isAdmin ? ' admin-text' : '');
+      textEl.className = 'bubble-text' + (messageIsAdmin ? ' admin-text' : '');
       textEl.appendChild(linkifyToFragment(m.text));
       bubble.appendChild(textEl);
     }
@@ -3697,7 +3803,8 @@ async function openAdminPanel(){
       `;
       genderSel.onchange = () => adminSetUserGender(u.username, genderSel.value);
       row.appendChild(genderSel);
-      // El admin no puede borrarse a sí mismo desde este panel.
+      // Loresmitt es la única cuenta protegida contra eliminación. Así se
+      // puede borrar la cuenta secundaria y volver a crearla con contraseña.
       if(u.username !== ADMIN_NAME){
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -4007,7 +4114,7 @@ async function openProfile(username){
     if(!u) u = usersCache[key];
     if(!u && username === ADMIN_NAME) u = buildAdminUser();
     if(!u) u = {username, color: colorFor(username)};
-    return u;
+    return applyKnownAdminRole(u);
   }
 
   // ANTES: se esperaba (await) a bajar TODO el documento compartido de
@@ -4263,7 +4370,7 @@ function collectUnreadPhotoComments(){
   if(!currentUser) return [];
   const photos = Array.isArray(myGalleryCache) ? myGalleryCache : [];
   const meLower = currentUser.username.toLowerCase();
-  const adminLower = ADMIN_NAME.toLowerCase();
+  const adminLowers = [ADMIN_NAME.toLowerCase(), SECONDARY_ADMIN_NAME.toLowerCase()];
   const lastRead = myPhotoCommentReadTs || 0;
   const items = [];
   // 1) Comentarios de otras personas en MIS fotos (como antes).
@@ -4284,7 +4391,7 @@ function collectUnreadPhotoComments(){
     const p = extPhotos.find(x=>x.id === entry.photoId);
     if(!p) return;
     (p.comments || []).forEach(c=>{
-      if(c.user && c.user.toLowerCase() === adminLower){
+      if(c.user && adminLowers.includes(c.user.toLowerCase())){
         items.push({photoId: p.id, owner: entry.owner, thumb: p.thumb, user: c.user, text: c.text, ts: c.ts, unread: c.ts > lastRead, isReply: true});
       }
     });
@@ -4677,6 +4784,9 @@ function closeProfile(){
 }
 
 function renderProfileView(u){
+  // Garantiza que ambos administradores reciban siempre el mismo diseño,
+  // incluso cuando el perfil acaba de llegar directamente desde Firestore.
+  u = applyKnownAdminRole(u);
   document.getElementById('profile-name').innerHTML = u.isAdmin
     ? `${u.username} <span class="admin-badge"><span class="admin-star">⭐</span>ADMIN</span>`
     : u.username;
@@ -4772,7 +4882,7 @@ function countLikesGivenBy(users, liker){
   // El administrador no tiene límite de likes: puede dar (y quitar) like a
   // los perfiles que quiera, tantas veces como quiera, sin el tope de 5 que
   // aplica a los usuarios normales.
-  if(liker === ADMIN_NAME) return 0;
+  if(isAdminUsername(liker)) return 0;
   return Object.values(users || {}).reduce((n, other) => {
     const otherLikes = Array.isArray(other && other.likes) ? other.likes : [];
     return n + (otherLikes.some(l => l.toLowerCase() === liker.toLowerCase()) ? 1 : 0);
@@ -5823,7 +5933,7 @@ async function handleAddComment(e){
   // "fotos ajenas donde comenté" — así, si el admin responde ahí más
   // adelante, me llega la notificación aunque la foto no sea mía. El propio
   // admin no necesita este seguimiento (no se notifica a sí mismo).
-  if(currentUser.username !== ADMIN_NAME && viewingProfile && viewingProfile.toLowerCase() !== currentUser.username.toLowerCase()){
+  if(!isAdminUsername(currentUser.username) && viewingProfile && viewingProfile.toLowerCase() !== currentUser.username.toLowerCase()){
     registerMyReplyTarget(p.id, viewingProfile);
   }
 }
