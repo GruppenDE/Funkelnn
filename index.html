@@ -3676,7 +3676,7 @@ async function broadcastTyping(isTyping){
       else delete val[currentUser.username];
       return val;
     });
-  }catch(e){ /* best-effort: el indicador no es crítico para el chat */ }
+  }catch(e){ console.error('typing broadcast failed', e); }
 }
 function attachTypingListener(room){
   detachTypingListener();
@@ -3685,7 +3685,7 @@ function attachTypingListener(room){
     try{ val = snap.exists ? (JSON.parse(snap.data().value || '{}') || {}) : {}; }
     catch(e){ val = {}; }
     if(room === currentRoom) renderTypingIndicator(val);
-  }, err=>{ /* silencioso: perder el indicador de "escribiendo" no rompe el chat */ });
+  }, err=>{ console.error('typing listener failed', err); });
 }
 function detachTypingListener(){
   if(activeTypingUnsub){ activeTypingUnsub(); activeTypingUnsub = null; }
