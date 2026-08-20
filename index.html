@@ -487,6 +487,25 @@
   .empty-room{margin:auto;text-align:center;color:var(--text-muted);font-size:13px;}
   .empty-room .big{font-size:34px;display:block;margin-bottom:8px;}
 
+  /* Indicador "Schreiben..." — aparece justo encima del composer cuando la
+     otra persona (o alguien más, en una sala grupal) está escribiendo. */
+  .typing-indicator{
+    flex:0 0 auto;padding:2px 22px;font-size:12px;color:var(--text-muted);
+    font-style:italic;display:flex;align-items:center;gap:6px;min-height:18px;
+  }
+  .typing-indicator.hidden{display:none;}
+  .typing-dots{display:inline-flex;gap:2px;}
+  .typing-dots span{
+    width:4px;height:4px;border-radius:50%;background:var(--text-muted);
+    animation:typing-bounce 1.2s infinite ease-in-out;
+  }
+  .typing-dots span:nth-child(2){animation-delay:.15s;}
+  .typing-dots span:nth-child(3){animation-delay:.3s;}
+  @keyframes typing-bounce{
+    0%,60%,100%{transform:translateY(0);opacity:.5;}
+    30%{transform:translateY(-3px);opacity:1;}
+  }
+
   .composer{
     flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding:16px 22px;background:var(--bg-panel);
     border-top:1px solid rgba(255,255,255,.06);
@@ -1719,6 +1738,10 @@
 
       <div class="chat-main">
         <div class="messages" id="messages"></div>
+        <div class="typing-indicator hidden" id="typing-indicator">
+          <span class="typing-dots"><span></span><span></span><span></span></span>
+          <span id="typing-indicator-text">Schreiben...</span>
+        </div>
         <form class="composer" onsubmit="handleSend(event)">
           <div class="composer-preview" id="composer-preview" style="display:none;">
             <div class="composer-preview-thumb" id="composer-preview-thumb"></div>
@@ -1731,7 +1754,7 @@
               <i class="fa-solid fa-arrow-left"></i>
             </button>
             <button type="button" class="btn-icon attach-btn" onclick="document.getElementById('media-file').click()" title="Foto oder Video anhängen" aria-label="Foto oder Video anhängen">📎</button>
-            <input id="msg-input" type="text" placeholder="Schreibe eine Nachricht oder füge einen Link ein..." maxlength="500" autocomplete="off">
+            <input id="msg-input" type="text" placeholder="Schreibe eine Nachricht oder füge einen Link ein..." maxlength="500" autocomplete="off" oninput="handleTypingInput()">
             <button class="btn-send" type="submit">➤</button>
           </div>
         </form>
@@ -2301,6 +2324,7 @@ function linkifyToFragment(text){
 function initials(name){ return name.trim().slice(0,2).toUpperCase(); }
 function newMsgId(){ return Date.now()+'-'+Math.random().toString(36).slice(2,8); }
 function msgKey(roomId){ return 'farol-msgs-'+roomId; }
+function typingKey(roomId){ return 'farol-typing-'+roomId; }
 function galleryKey(username){ return 'farol-gallery-'+username.toLowerCase(); }
 // Cada foto de galería guarda su versión completa en SU PROPIO documento de
 // Firestore (en vez de vivir dentro del array de la galería). Así el
@@ -3608,6 +3632,78 @@ async function handleSend(e){
   const media = pendingMedia;
   clearPendingMediaUI();
   queueMessage({text, media});
+  stopTyping();
+}
+
+/* ---------------- TYPING INDICATOR ("Schreiben...") ----------------
+   Un pequeño documento compartido por sala (farol-typing-<roomId>) guarda
+   qué usuarios están escribiendo ahora mismo, como {username: timestampMs}.
+   Se escribe con throttle mientras el usuario teclea (no en cada tecla) y
+   se limpia sola al enviar, al vaciar el input, o si nadie la borra, por
+   caducidad (TYPING_TTL_MS) del lado de quien la lee. */
+const TYPING_TTL_MS = 4000;
+let lastTypingBroadcast = 0;
+let typingIdleTimer = null;
+let activeTypingUnsub = null;
+
+function handleTypingInput(){
+  if(!currentUser || !currentRoom) return;
+  const input = document.getElementById('msg-input');
+  if(typingIdleTimer) clearTimeout(typingIdleTimer);
+  if(input.value.trim()){
+    broadcastTyping(true);
+    typingIdleTimer = setTimeout(stopTyping, 3000);
+  }else{
+    stopTyping();
+  }
+}
+function stopTyping(){
+  if(typingIdleTimer){ clearTimeout(typingIdleTimer); typingIdleTimer = null; }
+  broadcastTyping(false);
+}
+async function broadcastTyping(isTyping){
+  if(!currentUser || !currentRoom) return;
+  const room = currentRoom;
+  const now = Date.now();
+  // Mientras se está escribiendo, no hace falta re-escribir en cada tecla:
+  // basta con refrescar el timestamp cada 1.5s (el TTL de lectura es 4s).
+  if(isTyping && now - lastTypingBroadcast < 1500) return;
+  lastTypingBroadcast = now;
+  try{
+    await sTransact(typingKey(room), val=>{
+      val = val || {};
+      if(isTyping) val[currentUser.username] = now;
+      else delete val[currentUser.username];
+      return val;
+    });
+  }catch(e){ /* best-effort: el indicador no es crítico para el chat */ }
+}
+function attachTypingListener(room){
+  detachTypingListener();
+  activeTypingUnsub = kvDocRef(typingKey(room)).onSnapshot(snap=>{
+    let val = {};
+    try{ val = snap.exists ? (JSON.parse(snap.data().value || '{}') || {}) : {}; }
+    catch(e){ val = {}; }
+    if(room === currentRoom) renderTypingIndicator(val);
+  }, err=>{ /* silencioso: perder el indicador de "escribiendo" no rompe el chat */ });
+}
+function detachTypingListener(){
+  if(activeTypingUnsub){ activeTypingUnsub(); activeTypingUnsub = null; }
+  const el = document.getElementById('typing-indicator');
+  if(el) el.classList.add('hidden');
+}
+function renderTypingIndicator(val){
+  const el = document.getElementById('typing-indicator');
+  const textEl = document.getElementById('typing-indicator-text');
+  if(!el || !textEl || !currentUser) return;
+  const now = Date.now();
+  const others = Object.keys(val || {}).filter(u => u !== currentUser.username && (now - val[u]) < TYPING_TTL_MS);
+  if(others.length === 0){
+    el.classList.add('hidden');
+    return;
+  }
+  textEl.textContent = 'Schreiben...';
+  el.classList.remove('hidden');
 }
 
 // Shared by text sends and media attachments — builds the message,
@@ -4258,6 +4354,7 @@ function stopAllRealtime(){
 // incoming messages appear instantly instead of on the next 3s poll.
 function attachActiveRoomListener(room){
   detachActiveRoomListener();
+  attachTypingListener(room);
   activeRoomUnsub = kvDocRef(msgKey(room)).onSnapshot(snap=>{
     let val = [];
     try{ val = snap.exists ? (JSON.parse(snap.data().value || '[]') || []) : []; }
@@ -4295,6 +4392,8 @@ function attachActiveRoomListener(room){
 }
 function detachActiveRoomListener(){
   if(activeRoomUnsub){ activeRoomUnsub(); activeRoomUnsub = null; }
+  detachTypingListener();
+  stopTyping();
 }
 
 // Regular users only see the chats they're part of; the admin sees all of
