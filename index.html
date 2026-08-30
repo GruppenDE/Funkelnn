@@ -3267,8 +3267,14 @@ setInterval(updateValeriaCardMeter, 60000);
    persona inicia sesión (ver "pendingSharedRoute" y su uso en showChat()).
    Las tarjetas con "link" (p.ej. "Chatte mit Valeria") ya apuntan a una URL
    externa propia, así que no reciben botón de compartir interno. */
+// Los links para compartir SIEMPRE apuntan al dominio propio funkeln.site,
+// sin importar desde qué URL se esté accediendo a la app en este momento
+// (p.ej. si alguien todavía entra por el link viejo de GitHub Pages). Así,
+// cualquier sala o perfil que se comparta usa siempre la misma dirección
+// pública y reconocible.
+const SHARE_DOMAIN = 'https://funkeln.site/';
 function appShareBaseUrl(){
-  return location.origin + location.pathname;
+  return SHARE_DOMAIN;
 }
 // Codifica un texto para meterlo en el fragmento de la URL, pero deja "+"
 // tal cual (es un carácter válido ahí) en vez de convertirlo en "%2B", que
