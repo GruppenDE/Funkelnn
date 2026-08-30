@@ -2064,15 +2064,16 @@ let connectionWarningShown = false;
 let currentView = 'lobby'; // 'lobby' | 'chat'
 
 // Si la página se abrió con un link compartido de sala o de perfil
-// (p.ej. "...#/room/gaming" o "...#/profile/Lena"), lo guardamos acá ANTES
-// de que nada más toque el hash. showChat() lo consume una sola vez, apenas
-// la persona inicia sesión, para llevarla directo a esa sala/perfil.
+// (p.ej. "...#/room/Stuttgart" o "...#/profile/Lena"), lo guardamos acá
+// ANTES de que nada más toque el hash. showChat() lo consume una sola vez,
+// apenas la persona inicia sesión, para llevarla directo a esa sala/perfil.
+// Guardamos "value" tal cual vino en la URL (sin decodificar todavía):
+// cada tipo de ruta lo decodifica a su manera al usarlo (ver showChat()).
 let pendingSharedRoute = (function(){
   const h = location.hash || '';
   const m = h.match(/^#\/(room|profile)\/(.+)$/);
   if(!m) return null;
-  try{ return {type: m[1], value: decodeURIComponent(m[2])}; }
-  catch(e){ return null; }
+  return {type: m[1], value: m[2]};
 })();
 let pollTimer = null;
 let heartbeatTimer = null;
@@ -2971,10 +2972,14 @@ async function showChat(){
   if(pendingSharedRoute){
     const route = pendingSharedRoute;
     pendingSharedRoute = null;
-    if(route.type === 'room' && ROOMS.some(r => r.id === route.value && !r.link)){
-      enterRoom(route.value);
+    if(route.type === 'room'){
+      const room = findRoomByShareSlug(route.value);
+      if(room) enterRoom(room.id);
+      else openDiscoverView();
     } else if(route.type === 'profile'){
-      openProfile(route.value);
+      let username = route.value;
+      try{ username = decodeURIComponent(username); }catch(e){}
+      openProfile(username);
     } else {
       openDiscoverView();
     }
@@ -3254,20 +3259,47 @@ setInterval(updateValeriaCardMeter, 60000);
 /* ---------------- LINKS PARA COMPARTIR (salas y perfiles) ----------------
    Cada sala normal y cada perfil (incluido el del admin, que no es más que
    un usuario con isAdmin:true) tiene su propia URL con un hash del tipo
-   "#/room/<id>" o "#/profile/<usuario>". Al cargar la página, si esa URL
-   trae uno de estos hashes, la app entra directo a esa sala o abre ese
-   perfil apenas la persona inicia sesión (ver "pendingSharedRoute" y su uso
-   en showChat()). Las tarjetas con "link" (p.ej. "Chatte mit Valeria") ya
-   apuntan a una URL externa propia, así que no reciben botón de compartir
-   interno. */
+   "#/room/<Nombre-de-la-sala>" o "#/profile/<usuario>". Usamos el NOMBRE
+   real de la sala (no su id interno como "ayuda" o "gaming") para que el
+   link se vea reconocible al compartirlo, p.ej. ".../#/room/+18" en vez de
+   ".../#/room/ayuda". Al cargar la página, si esa URL trae uno de estos
+   hashes, la app entra directo a esa sala o abre ese perfil apenas la
+   persona inicia sesión (ver "pendingSharedRoute" y su uso en showChat()).
+   Las tarjetas con "link" (p.ej. "Chatte mit Valeria") ya apuntan a una URL
+   externa propia, así que no reciben botón de compartir interno. */
 function appShareBaseUrl(){
   return location.origin + location.pathname;
 }
-function roomShareUrl(id){
-  return appShareBaseUrl() + '#/room/' + encodeURIComponent(id);
+// Codifica un texto para meterlo en el fragmento de la URL, pero deja "+"
+// tal cual (es un carácter válido ahí) en vez de convertirlo en "%2B", que
+// se vería feo/críptico en la barra de direcciones (p.ej. la sala "+18").
+// La usan tanto los links de sala como los de perfil, para que ambos se
+// vean igual de limpios con el nombre/usuario real.
+function encodeShareSlug(str){
+  return encodeURIComponent(str).replace(/%2B/g, '+');
 }
+function roomShareUrl(id){
+  const room = ROOMS.find(r => r.id === id);
+  const slugSource = room ? room.name : id;
+  return appShareBaseUrl() + '#/room/' + encodeShareSlug(slugSource);
+}
+// Encuentra la sala normal (sin "link" externo) que corresponde a un slug
+// venido de la URL. Acepta tanto el nombre real de la sala (formato nuevo,
+// p.ej. "+18" o "Stuttgart") como el id interno viejo (formato anterior,
+// p.ej. "ayuda" o "gaming"), para que los links compartidos antes de este
+// cambio sigan funcionando.
+function findRoomByShareSlug(rawSlug){
+  if(!rawSlug) return null;
+  let decoded;
+  try{ decoded = decodeURIComponent(rawSlug); }catch(e){ decoded = rawSlug; }
+  return ROOMS.find(r => !r.link && (r.name === decoded || r.id === decoded || r.id === rawSlug)) || null;
+}
+// El "usuario" de un perfil YA ES su nombre real (así se llame el admin,
+// "Loresmitt (Telegram)", o cualquier otra persona registrada) — no hay un
+// id interno distinto que ocultar, así que solo lo codificamos de forma
+// prolija para la URL.
 function profileShareUrl(username){
-  return appShareBaseUrl() + '#/profile/' + encodeURIComponent(username);
+  return appShareBaseUrl() + '#/profile/' + encodeShareSlug(username);
 }
 async function copyLinkToClipboard(url, successMsg){
   try{
