@@ -2032,7 +2032,7 @@ const LAMPSEX_LOGO_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAB84
 const ROOMS = [
   {id:'general', icon:'img', photo:'https://ei.phncdn.com/videos/202205/09/407788811/thumbs_23/(m=eaSaaTbaAaaaa)(mh=9VNxVVOROhBk2Uyz)3.jpg', name:'Chatte mit Valeria', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://gruppende.github.io/chatgeil/', special:true},
   {id:'ayuda', emoji:'🔞', name:'+18', desc:'Inhalte für Erwachsene', capacity:20},
-  {id:'gaming', photo:LAMPSEX_LOGO_DATA_URI, name:'Lampsex', desc:'Wiege des Motors und der Ingenieurskunst', capacity:40, link:'https://gruppende.github.io/hotgallery/'},
+  {id:'gaming', photo:LAMPSEX_LOGO_DATA_URI, name:'Lampsex', desc:'Wiege des Motors und der Ingenieurskunst', capacity:40, link:'https://gruppende.github.io/hotgallery/', special:true},
   {id:'ligar', icon:'img', name:'München', desc:'Bier, Tradition und gute Stimmung', capacity:50},
   {id:'musica', icon:'img', name:'Hamburg', desc:'Hafen, Musik und Nachtleben', capacity:35},
   {id:'cine', icon:'img', name:'Frankfurt', desc:'Wolkenkratzer und Finanzrhythmus', capacity:35},
@@ -3174,13 +3174,28 @@ function fullnessLevel(pct){
 const VALERIA_PCT_MIN = 58;
 const VALERIA_PCT_MAX = 99;
 const VALERIA_CYCLE_MINUTES = 14; // 7 min bajando + 7 min subiendo, y se repite
-function valeriaPct(){
-  const period = VALERIA_CYCLE_MINUTES;
+
+// Config por sala especial: cada tarjeta "premium" (Valeria, Lampsex, ...)
+// puede tener su propio rango de ocupación simulada. "gaming" es la sala
+// Lampsex (logo "L"): igual que Valeria pero siempre entre 90% y 99%.
+const SPECIAL_PCT_CONFIG = {
+  general: {min: VALERIA_PCT_MIN, max: VALERIA_PCT_MAX, cycleMinutes: VALERIA_CYCLE_MINUTES},
+  gaming:  {min: 90, max: 99, cycleMinutes: VALERIA_CYCLE_MINUTES},
+};
+
+function specialRoomPct(roomId){
+  const cfg = SPECIAL_PCT_CONFIG[roomId] || {min: VALERIA_PCT_MIN, max: VALERIA_PCT_MAX, cycleMinutes: VALERIA_CYCLE_MINUTES};
+  const period = cfg.cycleMinutes;
   const half = period / 2;
   const slot = Math.floor(Date.now() / 60000) % period; // 0..period-1, un paso por minuto
-  const dist = Math.min(slot, period - slot); // 0 en el pico (99%), half en el valle
+  const dist = Math.min(slot, period - slot); // 0 en el pico (max%), half en el valle
   const t = dist / half; // 0 = pico, 1 = valle
-  return Math.round(VALERIA_PCT_MAX - t * (VALERIA_PCT_MAX - VALERIA_PCT_MIN));
+  return Math.round(cfg.max - t * (cfg.max - cfg.min));
+}
+// Alias retrocompatible: el resto del código puede seguir llamando
+// valeriaPct() para la tarjeta 'general' sin cambios.
+function valeriaPct(){
+  return specialRoomPct('general');
 }
 // Últimos datos de "en línea" que conocemos, para poder pintar el lobby al
 // instante (sin esperar a Firestore) usando el dato más reciente disponible.
@@ -3222,7 +3237,7 @@ function paintLobbyGrid(online){
     // una sala de chat, solo redirigen a la URL indicada en una pestaña nueva.
     card.onclick = r.link ? (() => window.open(r.link, '_blank', 'noopener')) : (() => enterRoom(r.id));
 
-    const vPct = r.special ? valeriaPct() : pct;
+    const vPct = r.special ? specialRoomPct(r.id) : pct;
     const vLevel = r.special ? fullnessLevel(vPct) : level;
     card.innerHTML = r.special ? `
       <button type="button" class="lobby-share-btn" onclick="shareExternalLink('${r.link}', '${r.name.replace(/'/g,"\\'")}', event)" title="Link zu diesem Raum kopieren" aria-label="Link zu diesem Raum kopieren">
@@ -3268,14 +3283,15 @@ function paintLobbyGrid(online){
 // momento como si no (así, cuando la persona vuelva a mirarlo, el número
 // ya está al día en vez de mostrar el valor viejo hasta el próximo repaint).
 function updateValeriaCardMeter(){
-  const card = document.querySelector('.lobby-card[data-special="1"]');
-  if(!card) return;
-  const pct = valeriaPct();
-  const level = fullnessLevel(pct);
-  const fill = card.querySelector('.lobby-meter-fill');
-  const label = card.querySelector('.lobby-pct');
-  if(fill){ fill.style.width = pct + '%'; fill.className = 'lobby-meter-fill level-' + level; }
-  if(label){ label.textContent = pct + '% voll'; label.className = 'lobby-pct level-' + level; }
+  document.querySelectorAll('.lobby-card[data-special="1"]').forEach(card=>{
+    const roomId = card.dataset.roomId;
+    const pct = specialRoomPct(roomId);
+    const level = fullnessLevel(pct);
+    const fill = card.querySelector('.lobby-meter-fill');
+    const label = card.querySelector('.lobby-pct');
+    if(fill){ fill.style.width = pct + '%'; fill.className = 'lobby-meter-fill level-' + level; }
+    if(label){ label.textContent = pct + '% voll'; label.className = 'lobby-pct level-' + level; }
+  });
 }
 setInterval(updateValeriaCardMeter, 60000);
 
