@@ -1998,7 +1998,6 @@ const ROOM_ICON_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAA
 /* ---------------- CONFIG ---------------- */
 const ROOMS = [
   {id:'general', icon:'img', photo:'https://ei.phncdn.com/videos/202205/09/407788811/thumbs_23/(m=eaSaaTbaAaaaa)(mh=9VNxVVOROhBk2Uyz)3.jpg', name:'Chatte mit Valeria', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://gruppende.github.io/chatgeil/', special:true},
-  {id:'lena', icon:'img', photo:'https://mundopack-tv.com/wp-content/uploads/2025/03/1-23-747x1024.jpeg', name:'Chatte mit Lena', desc:'Kostenloser Premium-Chat', capacity:60, link:'https://secretflirt.short.gy/DateFinden', special:true},
   {id:'gaming', icon:'img', name:'Stuttgart', desc:'Wiege des Motors und der Ingenieurskunst', capacity:40},
   {id:'ayuda', emoji:'🔞', name:'+18', desc:'Inhalte für Erwachsene', capacity:20},
   {id:'ligar', icon:'img', name:'München', desc:'Bier, Tradition und gute Stimmung', capacity:50},
@@ -2006,6 +2005,7 @@ const ROOMS = [
   {id:'cine', icon:'img', name:'Frankfurt', desc:'Wolkenkratzer und Finanzrhythmus', capacity:35},
   {id:'deportes', icon:'img', name:'Köln', desc:'Der Dom und der rheinische Frohsinn', capacity:35},
   {id:'presentaciones', icon:'img', name:'Berlin', desc:'Die Hauptstadt, die niemals schläft', capacity:30},
+  {id:'duesseldorf', flagUrl:'https://upload.wikimedia.org/wikipedia/commons/b/ba/Flag_of_Germany.svg', name:'Düsseldorf', desc:'Mode, Rhein und rheinische Lebensart', capacity:35},
   {id:'schweiz', flagUrl:'https://upload.wikimedia.org/wikipedia/commons/0/08/Flag_of_Switzerland_%28Pantone%29.svg', name:'Schweiz', desc:'Chats und neue Kontakte aus der Schweiz', capacity:40},
   {id:'oesterreich', flagUrl:'https://upload.wikimedia.org/wikipedia/commons/4/41/Flag_of_Austria.svg', name:'Österreich', desc:'Chats und neue Kontakte aus Österreich', capacity:40},
   {id:'usa', flagUrl:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Flag_of_the_United_States.svg/3840px-Flag_of_the_United_States.svg.png', name:'USA', desc:'Chats und neue Kontakte aus den USA', capacity:50},
@@ -2031,13 +2031,12 @@ const ADMIN_EMAIL = 'cristhianzh1994@gmail.com';
 // contra Firebase Authentication (ver handleLogin), así que la contraseña
 // real nunca aparece en el código fuente que cualquiera puede leer en el navegador.
 const ADMIN_NAME = 'Loresmitt (Telegram)';
-const SECONDARY_ADMIN_NAME = 'Lena_Chat18';
 const ADMIN_COLOR = '#FFD54A';
 const ONLINE_TTL = 30000;
 
 function isAdminUsername(username){
   const key = String(username || '').toLowerCase();
-  return key === ADMIN_NAME.toLowerCase() || key === SECONDARY_ADMIN_NAME.toLowerCase();
+  return key === ADMIN_NAME.toLowerCase();
 }
 
 function applyKnownAdminRole(user){
@@ -4469,7 +4468,7 @@ function collectUnreadPhotoComments(){
   if(!currentUser) return [];
   const photos = Array.isArray(myGalleryCache) ? myGalleryCache : [];
   const meLower = currentUser.username.toLowerCase();
-  const adminLowers = [ADMIN_NAME.toLowerCase(), SECONDARY_ADMIN_NAME.toLowerCase()];
+  const adminLowers = [ADMIN_NAME.toLowerCase()];
   const lastRead = myPhotoCommentReadTs || 0;
   const items = [];
   // 1) Comentarios de otras personas en MIS fotos (como antes).
