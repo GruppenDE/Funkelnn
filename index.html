@@ -3197,6 +3197,9 @@ function paintLobbyGrid(online){
     const vPct = r.link ? valeriaPct() : 0;
     const vLevel = r.link ? fullnessLevel(vPct) : '';
     card.innerHTML = r.link ? `
+      <button type="button" class="lobby-share-btn" onclick="shareExternalLink('${r.link}', '${r.name.replace(/'/g,"\\'")}', event)" title="Link zu diesem Raum kopieren" aria-label="Link zu diesem Raum kopieren">
+        <i class="fa-solid fa-share-nodes"></i>
+      </button>
       <div class="lobby-card-top">
         <div class="lobby-emoji">${roomIconHtml(r)}</div>
         <div class="lobby-live is-live"><span class="live-dot"></span>Live</div>
@@ -3295,6 +3298,13 @@ function shareRoomLink(id, ev){
 function shareProfileLink(username){
   if(!username) return;
   copyLinkToClipboard(profileShareUrl(username), `Profil-Link von ${username} kopiert!`);
+}
+// Para tarjetas tipo "Chatte mit Valeria": su link ya ES la URL externa a
+// compartir (no hay un hash interno propio), así que copiamos ese link tal
+// cual en vez de construir uno con roomShareUrl().
+function shareExternalLink(url, label, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  copyLinkToClipboard(url, `Link zu „${label}" kopiert!`);
 }
 
 async function enterRoom(id){
