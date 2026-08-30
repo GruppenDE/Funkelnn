@@ -1187,6 +1187,15 @@
     box-shadow:0 14px 30px -12px rgba(0,0,0,.5), 0 0 0 1px var(--border-glow);
   }
   .lobby-card:active{transform:translateY(-1px) scale(.99);}
+  .lobby-share-btn{
+    position:absolute;top:10px;right:10px;z-index:2;
+    width:30px;height:30px;border-radius:50%;
+    background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);
+    color:var(--text-muted);display:flex;align-items:center;justify-content:center;
+    font-size:13px;cursor:pointer;transition:background .2s ease, color .2s ease, transform .2s ease;
+  }
+  .lobby-share-btn:hover{background:var(--accent-amber);color:#fff;transform:scale(1.08);}
+  .lobby-share-btn:active{transform:scale(.95);}
   .lobby-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex:0 0 auto;}
   .lobby-emoji{
     width:44px;height:44px;border-radius:13px 13px 13px 4px;background:var(--bg-card-2);
@@ -1795,6 +1804,7 @@
           </div>
         </div>
         <div class="profile-head-actions">
+          <button class="btn-icon profile-share-btn" onclick="shareProfileLink(viewingProfile)" title="Profil-Link kopieren" aria-label="Profil-Link kopieren"><i class="fa-solid fa-share-nodes"></i></button>
           <button class="btn-primary profile-edit-toggle hidden" id="profile-edit-toggle" onclick="toggleProfileEdit()">Profil bearbeiten</button>
           <button class="btn-icon profile-logout-btn hidden" id="profile-logout-btn" onclick="logout()" title="Abmelden" aria-label="Abmelden"><i class="fa-solid fa-power-off"></i></button>
           <button class="btn-primary profile-dm-btn hidden" id="profile-dm-btn" onclick="startPrivateChat()"><i class="fa-solid fa-comment-dots"></i> Privater Chat</button>
@@ -2052,6 +2062,18 @@ let dmPartner = null; // username of the person we're DMing, or null when in a n
 // pueden volver a fallar varias veces seguidas).
 let connectionWarningShown = false;
 let currentView = 'lobby'; // 'lobby' | 'chat'
+
+// Si la página se abrió con un link compartido de sala o de perfil
+// (p.ej. "...#/room/gaming" o "...#/profile/Lena"), lo guardamos acá ANTES
+// de que nada más toque el hash. showChat() lo consume una sola vez, apenas
+// la persona inicia sesión, para llevarla directo a esa sala/perfil.
+let pendingSharedRoute = (function(){
+  const h = location.hash || '';
+  const m = h.match(/^#\/(room|profile)\/(.+)$/);
+  if(!m) return null;
+  try{ return {type: m[1], value: decodeURIComponent(m[2])}; }
+  catch(e){ return null; }
+})();
 let pollTimer = null;
 let heartbeatTimer = null;
 // Realtime state for private chats: a live cache of the shared DM index,
@@ -2943,10 +2965,25 @@ async function showChat(){
   startPhotoNotifRealtime();
   await renderLobby();
   startPolling();
-  // Pantalla de descubrimiento a pantalla completa (foto + like + chat
-  // privado gratis), al estilo Knuddels: se muestra automáticamente cada
-  // vez que se entra a la app; el usuario la cierra (✕) para ir al lobby.
-  openDiscoverView();
+  // Si venimos de un link compartido de sala o perfil, vamos directo ahí en
+  // vez de mostrar la pantalla de descubrimiento (la persona ya sabe a dónde
+  // quiere ir: eso es justamente lo que dice el link que abrió).
+  if(pendingSharedRoute){
+    const route = pendingSharedRoute;
+    pendingSharedRoute = null;
+    if(route.type === 'room' && ROOMS.some(r => r.id === route.value && !r.link)){
+      enterRoom(route.value);
+    } else if(route.type === 'profile'){
+      openProfile(route.value);
+    } else {
+      openDiscoverView();
+    }
+  } else {
+    // Pantalla de descubrimiento a pantalla completa (foto + like + chat
+    // privado gratis), al estilo Knuddels: se muestra automáticamente cada
+    // vez que se entra a la app; el usuario la cierra (✕) para ir al lobby.
+    openDiscoverView();
+  }
   // Cuentas creadas con Google (o cuentas antiguas de antes de que existiera
   // este campo) no tienen género guardado todavía. Antes este modal
   // automático se mostraba SOLO al administrador — cualquier usuario nuevo
@@ -3173,6 +3210,9 @@ function paintLobbyGrid(online){
         <span class="lobby-pct level-${vLevel}">${vPct}% voll</span>
         <span class="lobby-enter">Öffnen →</span>
       </div>` : `
+      <button type="button" class="lobby-share-btn" onclick="shareRoomLink('${r.id}', event)" title="Link zu diesem Raum kopieren" aria-label="Link zu diesem Raum kopieren">
+        <i class="fa-solid fa-share-nodes"></i>
+      </button>
       <div class="lobby-card-top">
         <div class="lobby-emoji">${roomIconHtml(r)}</div>
         <div class="lobby-live ${count>0?'is-live':''}"><span class="live-dot"></span>${count} ${count===1?'Person':'Personen'}</div>
@@ -3207,6 +3247,55 @@ function updateValeriaCardMeter(){
   if(label){ label.textContent = pct + '% voll'; label.className = 'lobby-pct level-' + level; }
 }
 setInterval(updateValeriaCardMeter, 60000);
+
+/* ---------------- LINKS PARA COMPARTIR (salas y perfiles) ----------------
+   Cada sala normal y cada perfil (incluido el del admin, que no es más que
+   un usuario con isAdmin:true) tiene su propia URL con un hash del tipo
+   "#/room/<id>" o "#/profile/<usuario>". Al cargar la página, si esa URL
+   trae uno de estos hashes, la app entra directo a esa sala o abre ese
+   perfil apenas la persona inicia sesión (ver "pendingSharedRoute" y su uso
+   en showChat()). Las tarjetas con "link" (p.ej. "Chatte mit Valeria") ya
+   apuntan a una URL externa propia, así que no reciben botón de compartir
+   interno. */
+function appShareBaseUrl(){
+  return location.origin + location.pathname;
+}
+function roomShareUrl(id){
+  return appShareBaseUrl() + '#/room/' + encodeURIComponent(id);
+}
+function profileShareUrl(username){
+  return appShareBaseUrl() + '#/profile/' + encodeURIComponent(username);
+}
+async function copyLinkToClipboard(url, successMsg){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(url);
+    } else {
+      // Respaldo para navegadores/contextos sin acceso al portapapeles moderno.
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    showToast(successMsg, 'success');
+  }catch(e){
+    showToast('Link konnte nicht kopiert werden.', 'error');
+  }
+}
+function shareRoomLink(id, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const room = ROOMS.find(r=>r.id===id);
+  const label = room ? room.name : id;
+  copyLinkToClipboard(roomShareUrl(id), `Link zu „${label}" kopiert!`);
+}
+function shareProfileLink(username){
+  if(!username) return;
+  copyLinkToClipboard(profileShareUrl(username), `Profil-Link von ${username} kopiert!`);
+}
 
 async function enterRoom(id){
   document.getElementById('view-lobby').classList.add('hidden');
@@ -6054,7 +6143,12 @@ async function handleAddComment(e){
   // Registra un par abrir/cerrar. openNames puede ser un solo nombre o una
   // lista (p.ej. una sala se puede "abrir" desde varias funciones distintas
   // pero siempre se cierra con la misma).
-  function registerNavItem(name, openNames, closeName){
+  // "urlFn" (opcional) recibe los mismos argumentos con los que se llamó a
+  // la función de apertura y devuelve la URL compartible que debe mostrarse
+  // en la barra de direcciones (p.ej. el link de la sala o del perfil). Si
+  // no aplica (por ejemplo, un chat privado) puede devolver algo falsy y la
+  // URL actual se deja como está.
+  function registerNavItem(name, openNames, closeName, urlFn){
     if(!Array.isArray(openNames)) openNames = [openNames];
     const originalClose = window[closeName];
     if(typeof originalClose !== 'function') return;
@@ -6066,7 +6160,9 @@ async function handleAddComment(e){
         const result = originalOpen.apply(this, args);
         if(!navStack.length || navStack[navStack.length - 1].name !== name){
           navStack.push({name, close: originalClose});
-          history.pushState({funkelnNav: name}, '');
+          const url = (typeof urlFn === 'function') ? urlFn(...args) : null;
+          if(url) history.pushState({funkelnNav: name}, '', url);
+          else history.pushState({funkelnNav: name}, '');
         }
         return result;
       };
@@ -6086,7 +6182,9 @@ async function handleAddComment(e){
     };
   }
 
-  registerNavItem('profile', 'openProfile', 'closeProfile');
+  // Perfil: la URL pasa a ser "#/profile/<usuario>" (funciona igual para el
+  // admin, que no es más que un usuario con isAdmin:true).
+  registerNavItem('profile', 'openProfile', 'closeProfile', (username) => profileShareUrl(username));
   registerNavItem('admin', 'openAdminPanel', 'closeAdminPanel');
   registerNavItem('dmList', 'openPrivateChatsList', 'closePrivateChatsList');
   registerNavItem('photoNotif', 'openPhotoNotifications', 'closePhotoNotifications');
@@ -6097,7 +6195,12 @@ async function handleAddComment(e){
   // cerrarse con el botón "atrás" del celular/navegador sin haber guardado.
   registerNavItem('lightbox', 'openLightbox', 'closeLightbox');
   registerNavItem('discover', 'openDiscoverView', 'closeDiscoverView');
-  registerNavItem('chat', ['enterRoom', 'openDirectChat', 'openDirectChatByUsers'], 'backToLobby');
+  // Sala: la URL pasa a ser "#/room/<id>" SOLO cuando el argumento recibido
+  // es de verdad el id de una sala normal (enterRoom). Un chat privado
+  // (openDirectChat/openDirectChatByUsers) recibe un nombre de usuario, no
+  // coincide con ninguna sala, y por lo tanto no toca la URL.
+  registerNavItem('chat', ['enterRoom', 'openDirectChat', 'openDirectChatByUsers'], 'backToLobby',
+    (arg) => (typeof arg === 'string' && ROOMS.some(r => r.id === arg && !r.link)) ? roomShareUrl(arg) : null);
 
 
   window.addEventListener('popstate', () => {
@@ -6113,8 +6216,12 @@ async function handleAddComment(e){
     }
   });
 
-  // Estado base para que siempre haya algo que "consumir" antes de intentar salir.
-  history.replaceState({funkelnNav: 'root'}, '');
+  // Estado base para que siempre haya algo que "consumir" antes de intentar
+  // salir. Limpiamos cualquier hash de link compartido con el que se haya
+  // abierto la página (ya quedó guardado en "pendingSharedRoute" más
+  // arriba), para que volver hasta el fondo del historial muestre una URL
+  // limpia en vez del link por el que se entró.
+  history.replaceState({funkelnNav: 'root'}, '', location.pathname + location.search);
 })();
 
 /* ================= APP INSTALL BANNER (PWA: Android + iOS) ================= */
